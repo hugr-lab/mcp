@@ -113,7 +113,7 @@ func (s *Service) TypeFieldsIntrospection(ctx context.Context, req *TypeFieldsRe
 		}
 
 		if req.IncludeDescription {
-			f.DescriptionSnippet = it.DescriptionSnippet
+			f.DescriptionSnippet = it.Description
 		}
 		if req.IncludeArguments {
 			for _, a := range it.Arguments {
@@ -165,8 +165,7 @@ type typeFieldInfoResult struct {
 		IsList      bool   `json:"is_list,omitempty"`
 		IsNonNull   bool   `json:"is_non_null,omitempty"`
 	} `json:"arguments,omitempty"`
-	DescriptionSnippet string  `json:"description_snippet,omitempty"`
-	Score              float64 `json:"score,omitempty"`
+	Score float64 `json:"score,omitempty"`
 }
 
 const typeFieldsInfoQuery = `query ($name: String!, $ttl: Int!) {
