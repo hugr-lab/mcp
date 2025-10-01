@@ -40,7 +40,20 @@ Schema Organization:
     }
     ```
   - Functions may return scalars, objects, or lists.  
-  - Functions can propagate arguments from parent rows (row-level).  
+  - Functions can propagate arguments from parent rows (row-level).
+  - To call functions, use their exact names and provide required arguments and modules. Use top-level function field before module, e.g.:
+    ```graphql
+    query {
+      function{
+        sales {
+          customer_stats(customer_id: 123) {
+            total_orders
+            total_spent
+          }
+        }
+      }
+    }
+    ```  
 
 Data Objects:
 - Standard args: `filter`, `order_by`, `limit`, `offset`, `distinct_on`, `args`.  

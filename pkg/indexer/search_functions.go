@@ -13,6 +13,7 @@ import (
 
 type FunctionSearchItem struct {
 	Name        string                       `json:"name" jsonschema_description:"Name of the function"`
+	Module      string                       `json:"module" jsonschema_description:"Module where the function is defined"`
 	Description string                       `json:"description" jsonschema_description:"Description of the function"`
 	IsMutation  bool                         `json:"is_mutation" jsonschema_description:"Indicates if the function is a mutation"`
 	IsList      bool                         `json:"is_list" jsonschema_description:"Indicates if the function returns a list"`
@@ -145,6 +146,7 @@ func (s *Service) SearchModuleFunctions(ctx context.Context, req *SearchFunction
 		}
 		fr := FunctionSearchItem{
 			Name:        it.Name,
+			Module:      it.RootType.Module,
 			Description: it.Description,
 			IsMutation:  isMutation,
 			IsList:      it.IsList,
