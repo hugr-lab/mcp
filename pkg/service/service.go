@@ -80,7 +80,7 @@ func (s *Service) Init(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize indexer: %w", err)
 	}
 
-	s.mcp.AddTool(testTool, s.testToolHandler)
+	//s.mcp.AddTool(testTool, s.testToolHandler)
 	s.mcp.AddTool(discoveryModulesTool, s.discoveryModulesHandler)
 	s.mcp.AddTool(discoveryDataSourcesTool, s.discoveryDataSourcesHandler)
 	s.mcp.AddTool(discoveryModuleObjectsTool, s.discoveryModuleObjectsHandler)

@@ -83,7 +83,29 @@ Data Objects:
   - ordered fields must be selected in the query
   - supports direction: `asc`, `desc`
   - use the `order_by` arg for standard ordering, `nested_order_by` for post-join ordering
-  - `order_by` accepts array of objects {field: "field_name", direction: ASC/DESC} for multi-level ordering
+  - `order_by` accepts array of objects {field: "field_name", direction: ASC/DESC} for multi-level ordering.
+  - Field should be included in the selection set. `field` shoudld be pointed right to the aliased field name, e.g.:
+    ```graphql
+    query {
+      orders {
+        id total items(order_by: [{field: "product", direction: ASC}]) {
+          product { product: name category }
+        }
+      }
+      orders_bucket_aggregation(
+        order_by: [
+          {field: "key.category", direction: ASC},
+          {field: "aggregations.total.sum", direction: DESC}
+        ]
+        limit: 10
+      ) {
+        key { category }
+        aggregations {
+          total: amount { sum avg }
+        }
+      }
+    }
+    ```
 - Distinct on:
   - accepts array of field names to return distinct rows based on those fields
   - fields must be selected in the query
@@ -128,23 +150,104 @@ Data Objects:
         }
       }
       ```
+- Subquery and references records aggregation:
+  - you can select aggregated data from a one-to-many and many-to-many relation using `<relation>_aggregation` or `<relation_bucket_aggregation>` fields, if it accessible by user role
+  - you can also aggregate over joins fields using `<join_field>_aggregation` or `<join_field>_bucket_aggregation`
+  - e.g.:
+    ```graphql
+    query {
+      customers {
+        id name
+        orders_aggregation {
+          _rows_count
+          total: amount { sum avg }
+        }
+        orders_bucket_aggregation {
+          key { status }
+          aggregations {
+            _rows_count
+            total: amount { sum avg }
+          }
+        }
+      }
+      sales {
+        orders { id total
+          customer { id name
+            orders_aggregation {
+              _rows_count
+              total: amount { sum avg }
+            }
+          }
+        }
+      }
+    }
+    ```
 
 Special Subqueries
 - **_join**:  
   - Arg `fields`: array of source field names  
   - Each subfield also requires `fields`  
   - Supports records, aggregation, bucket_aggregation  
-
-Special Subqueries
-- **_join**:  
-  - Arg `fields`: array of source field names  
-  - Each subfield also requires `fields`  
-  - Supports records, aggregation, bucket_aggregation  
-  - Standard args apply **before** join, nested args apply **after** join  
+  - Standard args apply **before** join, nested args apply **after** join
+  - example:
+    ```graphql
+    query {
+      marketing{
+        customers_infos{
+          customer_id
+          revenue
+          _join(fields: ["customer_id"]) {
+            customer(fields: ["marketing_id"]) {
+              id name category
+              orders_aggregation {
+                _rows_count
+                total: amount { sum avg }
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
 - **_spatial**:  
   - Args: `field`, `type` (`INTERSECTS`, `WITHIN`, `CONTAINS`, `DISJOIN`, `DWITHIN`), `buffer` (for `DWITHIN`)  
   - Subfields must specify `field` of joined object  
-  - Supports records, aggregation, bucket_aggregation  
+  - Supports records, aggregation, bucket_aggregation
+  - Standard args apply **before** spatial filter, nested args apply **after** spatial filter
+  - example:
+    ```graphql
+    query {
+      gis {
+        areas { id name geom
+          _spatial(field: "geom", type: INTERSECTS) {
+            roads(
+              field: "geom"
+              filter: { type: { eq: "primary" } }
+              nested_order_by: [{ field: "length", direction: DESC }]
+              nested_limit: 5
+            ) { id name length }
+            roads_aggregation(field: "geom") {
+              _rows_count
+              total: length { sum avg }
+            }
+            roads_bucket_aggregation(
+              field: "geom"
+              order_by: [
+                { field: "aggregations.total.sum", direction: DESC }
+              ]
+            ) {
+              key { type }
+              aggregations {
+                _rows_count
+                total: length { sum avg }
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+- You can use `_join` and `_spatial` in aggregations and bucket aggregations too.
 
 Aggregations:
 - `<object>_aggregation` → single aggregated row  
@@ -205,6 +308,9 @@ Workflow:
 4. Use **schema-type_info**, **schema-type_fields**, **schema-enum_values** for deeper introspection.  
 5. Use **discovery-data_object_field_values** for clarifying categories and filter options.  
 6. Build safe Hugr GraphQL queries with modules, objects, relations, functions, `_join`, `_spatial`, aggregations.
-7. To analyze the data try to use aggregations, grouping, and previews instead of raw large queries to the data objects. Use the filter across relations to limit data early.
-7. Use `jq` when reshaping results is needed.  
-8. Present the final answer in the user’s language, with explanation, tables, or charts if relevant.
+7. Use `_join` and `_spatial` if there are no relations between objects defined in the schema.
+8. To analyze the data try to use aggregations, grouping, and previews instead of raw large queries to the data objects. Use the filter and aggregation across relations to limit data early.
+9. Use `jq` when reshaping results is needed.
+10. Present the final answer in the user’s language, with explanation, tables, or charts if relevant.
+
+Be concise, accurate, and clear. Do not create web pages or long narratives if it is not requested.

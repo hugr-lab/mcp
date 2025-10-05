@@ -16,15 +16,63 @@ import (
 // PartialLoad loads parts of schema on demand
 
 // LoadDataObject loads/reloads data object by name, including its fields, arguments, inputs, aggregations.
-func (s *Service) LoadDataObject(ctx context.Context, name string) error {
-	// 1. Fetch data object from Hugr
-	// 2. Get fields, arguments, inputs, types for fields and arguments
-	// 3. Add to MCP DB if not exists, or update if exists
-	// 4. Mark as loaded
+func (s *Service) LoadDataObject(ctx context.Context, name string, patrial bool) error {
+	schema, err := s.fetchSchema(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch schema: %w", err)
+	}
+	meta, err := s.fetchSummary(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch meta summary: %w", err)
+	}
+	if !patrial {
+		err := s.clearDataObjectTypes(ctx, schema, meta, name)
+		if err != nil {
+			return fmt.Errorf("failed to clear data object types: %w", err)
+		}
+	}
+	typesMap := map[string]struct{}{}
+	fieldsMap := map[string]map[string]struct{}{}
+	modulesMap := map[string]struct{}{}
+	dataSourcesMap := map[string]struct{}{}
+	err = fillDataObjectTypesForUpdate(schema, meta, name, typesMap, fieldsMap, modulesMap, dataSourcesMap)
+	if err != nil {
+		return fmt.Errorf("failed to fill data object types for update: %w", err)
+	}
+	err = s.loadSchemaPatrial(ctx, schema, meta, patrial, typesMap, fieldsMap, modulesMap, dataSourcesMap)
+	if err != nil {
+		return fmt.Errorf("failed to load schema patrial: %w", err)
+	}
 	return nil
 }
 
-func (s *Service) LoadFunction(ctx context.Context, module, name string) error {
+func (s *Service) LoadFunction(ctx context.Context, module, name string, patrial bool) error {
+	schema, err := s.fetchSchema(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch schema: %w", err)
+	}
+	meta, err := s.fetchSummary(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch meta summary: %w", err)
+	}
+	if !patrial {
+		err := s.clearFunctionTypes(ctx, schema, meta, module, name)
+		if err != nil {
+			return fmt.Errorf("failed to clear function types: %w", err)
+		}
+	}
+	typesMap := map[string]struct{}{}
+	fieldsMap := map[string]map[string]struct{}{}
+	modulesMap := map[string]struct{}{}
+	dataSourcesMap := map[string]struct{}{}
+	err = fillFunctionTypesForUpdate(schema, meta, module, name, typesMap, fieldsMap, modulesMap, dataSourcesMap)
+	if err != nil {
+		return fmt.Errorf("failed to fill function types for update: %w", err)
+	}
+	err = s.loadSchemaPatrial(ctx, schema, meta, patrial, typesMap, fieldsMap, modulesMap, dataSourcesMap)
+	if err != nil {
+		return fmt.Errorf("failed to load schema patrial: %w", err)
+	}
 	return nil
 }
 
@@ -231,6 +279,7 @@ func (s *Service) clearDataObjectTypes(ctx context.Context, schema *SchemaIntro,
 		}
 		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": doName}})
 		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{"type_name": {"eq": doName}})
+
 		// delete filter type fields
 		if doi.FilterType != "" {
 			deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": doi.FilterType}})
@@ -366,27 +415,8 @@ func (s *Service) clearDataObjectTypes(ctx context.Context, schema *SchemaIntro,
 			}
 		}
 	}
-	res, err := s.h.Query(ctx, `mutation ($fieldFilter: [mcp_fields_filter!], $argFilter: [mcp_arguments_filter!]) {
-		core {
-			mcp {
-				delete_arguments(filter: {_or: $argFilter}) { success }
-				delete_fields(filter: {_or: $fieldFilter}) { success }
-			}
-		}
-	}`,
-		map[string]any{
-			"fieldFilter": deleteFieldFilters,
-			"argFilter":   deleteArgFilters,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to delete filters: %w", err)
-	}
-	defer res.Close()
-	if res.Err() != nil {
-		return fmt.Errorf("failed to delete filters: %w", res.Err())
-	}
-	return nil
+
+	return s.deleteFieldsAndArguments(ctx, deleteFieldFilters, deleteArgFilters)
 }
 
 func fillDataObjectTypesForUpdate(schema *SchemaIntro, meta *metainfo.SchemaInfo, doName string,
@@ -633,6 +663,93 @@ func fillDataObjectTypesForUpdate(schema *SchemaIntro, meta *metainfo.SchemaInfo
 			fieldsMap[base.QueryTimeSpatialTypeName+compiler.AggregationSuffix][prefix+q.Name] = struct{}{}
 			fieldsMap[base.H3DataQueryTypeName][prefix+q.Name] = struct{}{}
 		}
+	}
+	return nil
+}
+
+func (s *Service) clearFunctionTypes(ctx context.Context, schema *SchemaIntro, meta *metainfo.SchemaInfo, module, name string) error {
+	mi := meta.Module(module)
+	if mi == nil {
+		return fmt.Errorf("module %s not found in summary", module)
+	}
+	isMutation := false
+	fi := mi.Function(name)
+	if fi == nil {
+		fi = mi.MutationFunction(name)
+		isMutation = true
+		if fi == nil {
+			return fmt.Errorf("function %s not found in module %s", name, module)
+		}
+	}
+
+	var deleteFieldFilters, deleteArgFilters []map[string]map[string]any
+	// add filter function return type fields
+	if fi.ReturnType != "" {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": fi.ReturnType}})
+		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{"type_name": {"eq": fi.ReturnType}})
+	}
+	// add function arguments types fields
+	for _, a := range fi.Arguments {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": a.Type}})
+	}
+	// add aggregation type fields
+	if fi.AggregationType != "" {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": fi.AggregationType}})
+		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{"type_name": {"eq": fi.AggregationType}})
+	}
+	// add sub-aggregation type fields
+	if fi.SubAggregationType != "" {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": fi.SubAggregationType}})
+		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{"type_name": {"eq": fi.SubAggregationType}})
+	}
+	// add bucket-aggregation type fields
+	if fi.BucketAggregationType != "" {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{"type_name": {"eq": fi.BucketAggregationType}})
+		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{"type_name": {"eq": fi.BucketAggregationType}})
+	}
+	if isMutation && mi.MutationFunctionType != "" {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{
+			"name":      {"eq": fi.Name},
+			"type_name": {"eq": mi.MutationFunctionType},
+		})
+		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{
+			"field_name": {"eq": fi.Name},
+			"type_name":  {"eq": mi.MutationFunctionType},
+		})
+	}
+	if !isMutation && mi.FunctionType != "" {
+		deleteFieldFilters = append(deleteFieldFilters, map[string]map[string]any{
+			"name":      {"eq": fi.Name},
+			"type_name": {"eq": mi.FunctionType},
+		})
+		deleteArgFilters = append(deleteArgFilters, map[string]map[string]any{
+			"field_name": {"eq": fi.Name},
+			"type_name":  {"eq": mi.FunctionType},
+		})
+	}
+	return s.deleteFieldsAndArguments(ctx, deleteFieldFilters, deleteArgFilters)
+}
+
+func (s *Service) deleteFieldsAndArguments(ctx context.Context, filterFields, filterArgs []map[string]map[string]any) error {
+	res, err := s.h.Query(ctx, `mutation ($fieldFilter: [mcp_fields_filter!], $argFilter: [mcp_arguments_filter!]) {
+		core {
+			mcp {
+				delete_arguments(filter: {_or: $argFilter}) { success }
+				delete_fields(filter: {_or: $fieldFilter}) { success }
+			}
+		}
+	}`,
+		map[string]any{
+			"fieldFilter": filterFields,
+			"argFilter":   filterArgs,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete function types: %w", err)
+	}
+	defer res.Close()
+	if res.Err() != nil {
+		return fmt.Errorf("failed to delete function types: %w", res.Err())
 	}
 	return nil
 }
