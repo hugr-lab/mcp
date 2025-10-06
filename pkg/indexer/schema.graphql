@@ -1,0 +1,305 @@
+type version_info @table(name: "version_info") {
+  version: String @pk
+  applied_at: Timestamp
+}
+
+"Data sources"
+type data_sources @table(name: "data_sources") {{if .EmbeddingsEnabled }} @embeddings( model: "{{ .EmbeddingModel }}", vector: "vec", distance: Cosine ) {{end}} {
+  name: String! @pk
+  description: String!
+  long_description: String!
+  type: String!
+  prefix: String
+  as_module: Boolean
+  read_only: Boolean
+  is_summarized: Boolean
+  disabled: Boolean
+  vec: Vector @dim(len: {{ .VectorSize }})
+}
+
+"Schema types"
+type types @table(name: "types") {{if .EmbeddingsEnabled }} @embeddings( model: "{{ .EmbeddingModel }}", vector: "vec", distance: Cosine ) {{end}} {
+  name: String! @pk
+  description: String!
+  long_description: String!
+  kind: String!
+  hugr_type: String!
+  catalog: String @field_references(
+    name: "types_catalog_data_sources_name",
+    field: "name",
+    references_name: "data_sources",
+    query: "data_source",
+    description: "The catalog that the type belongs to",
+    references_query: "types_in_catalog",
+    references_description: "Types that belong to this catalog"
+  )
+  module: String!
+  is_summarized: Boolean
+  vec: Vector @dim(len: {{ .VectorSize }})
+}
+
+"Schema modules"
+type modules @table(name: "modules") {{if .EmbeddingsEnabled }} @embeddings( model: "{{ .EmbeddingModel }}", vector: "vec", distance: Cosine ) {{end}} {
+  name: String! @pk
+  description: String!
+  long_description: String!
+  query_root: String @field_references(
+    name: "modules_query_types_name"
+    field: "name"
+    references_name: "types"
+    query: "query"
+    description: "The root query type for the module"
+    references_query: "module_query"
+    references_description: "The module query type"
+  )
+  mutation_root: String @field_references(
+    name: "modules_mutation_types_name"
+    field: "name"
+    references_name: "types"
+    query: "mutation"
+    description: "The root mutation type for the module"
+    references_query: "module_mutations"
+    references_description: "The module mutation type"
+  )
+  function_root: String @field_references(
+    name: "modules_function_types_name"
+    field: "name"
+    references_name: "types"
+    query: "function"
+    description: "The root function type for the module"
+    references_query: "module_functions"
+    references_description: "The module function type"
+  )
+  mut_function_root: String @field_references(
+    name: "modules_mut_function_types_name"
+    field: "name"
+    references_name: "types"
+    query: "mut_function"
+    description: "The root mutation function type for the module"
+    references_query: "module_mut_functions"
+    references_description: "The module mutation function type"
+  )
+  is_summarized: Boolean
+  disabled: Boolean
+  vec: Vector @dim(len: {{ .VectorSize }})
+}
+
+extend type types {
+  module: String! @field_references(
+    name: "types_module_modules_name"
+    field: "name"
+    references_name: "modules"
+    query: "module_info"
+    description: "The module that the type belongs to"
+    references_query: "types_in_module"
+    references_description: "Types that belong to this module"
+  )
+}
+
+type fields @table(name: "fields") {{if .EmbeddingsEnabled }} @embeddings( model: "{{ .EmbeddingModel }}", vector: "vec", distance: Cosine ) {{end}} {
+  name: String! @pk
+  type_name: String! @pk @field_references(
+    name: "fields_type_name_types_name", 
+    field: "name", 
+    references_name: "types", 
+    query: "root_type", 
+    description: "The type of the field", 
+    references_query: "fields", 
+    references_description: "Type fields"
+  )
+  type: String! @field_references(
+    name: "fields_type_types_name", 
+    field: "name", 
+    references_name: "types", 
+    query: "field_type", 
+    description: "The type of the field", 
+    references_query: "typed_fields", 
+    references_description: "Fields that have this type"
+  )
+  description: String!
+  hugr_type: String!
+  catalog: String @field_references(
+    name: "fields_catalog_data_sources_name",
+    field: "name",
+    references_name: "data_sources",
+    query: "data_source",
+    description: "The catalog that the field belongs to",
+    references_query: "fields_in_catalog",
+    references_description: "Fields that belong to this catalog"
+  )
+  is_indexed: Boolean
+  is_list: Boolean
+  is_non_null: Boolean
+  is_primary_key: Boolean
+  mcp_exclude: Boolean
+  vec: Vector @dim(len: {{ .VectorSize }})
+  is_summarized: Boolean
+}
+
+
+type arguments @table(name: "arguments") @references(
+  name: "arguments_fields_name",
+  source_fields: ["field_name", "type_name"]
+  references_fields: ["name", "type_name"]
+  references_name: "fields",
+  query: "field",
+  description: "The field that the argument belongs to",
+  references_query: "arguments",
+  references_description: "Field arguments"
+) {
+  type_name: String! @pk
+  field_name: String! @pk
+  name: String! @pk
+  type: String! @field_references(
+    name: "arguments_type",
+    field: "name",
+    references_name: "types",
+    query: "argument_type",
+    description: "The type of the argument",
+    references_query: "arguments",
+    references_description: "Arguments that have this type"
+  )
+  description: String!
+  is_list: Boolean
+  is_non_null: Boolean
+}
+
+type data_objects @table(name: "data_objects") {
+  name: String! @pk @field_references(
+    name: "data_objects_name_types_name",
+    field: "name",
+    references_name: "types",
+    query: "type",
+    description: "The type of the data object",
+    references_query: "data_object",
+    references_description: "Data objects that have this type"
+  )
+  filter_type_name: String! @field_references(
+    name: "data_objects_filter_type_name_types_name",
+    field: "name",
+    references_name: "types",
+    query: "filter_type",
+    description: "The filter type of the data object",
+    references_query: "filter_for_data_objects",
+    references_description: "Data objects that have this filter type"
+  )
+  args_type_name: String @field_references(
+    name: "data_objects_args_type_name_types_name",
+    field: "name",
+    references_name: "types",
+    query: "args_type",
+    description: "The args type of the data object",
+    references_query: "args_for_data_objects",
+    references_description: "Data objects that have this args type"
+  )
+}
+
+type data_object_queries @table(name: "data_object_queries") @references(
+  name: "data_object_queries_data_name_fields_name",
+  source_fields: ["query_root", "name"],
+  references_fields: ["type_name","name"],
+  references_name: "fields",
+  query: "field",
+  description: "The data object that the query belongs to",
+  references_query: "queries",
+  references_description: "Data object queries"
+) {
+  name: String! @pk
+  object_name: String! @pk @field_references(
+    name: "data_object_queries_object_name_data_objects_name",
+    field: "name",
+    references_name: "data_objects",
+    query: "data_object",
+    description: "The data object that the query belongs to",
+    references_query: "queries",
+    references_description: "Data object queries"
+  )
+  query_root: String! @field_references(
+    name: "data_object_queries_query_root_types_name",
+    field: "name",
+    references_name: "types",
+    query: "module_query_type",
+    description: "The root query type of the data object query",
+    references_query: "data_object_queries",
+    references_description: "Data object queries that have this root query type"
+  )
+  query_type: String!
+}
+
+
+type module_intro @view(
+  name: "module_intro"
+  sql: """
+  SELECT 
+  	m.name AS module,
+  	'queries' AS type_type,
+  	qt.name AS type_name,
+  	qft.name AS field_name,
+  	qft.description AS field_description, 
+  	qft.hugr_type,
+  	qft.catalog
+  FROM modules AS m
+    INNER JOIN types AS qt ON m.query_root = qt.name
+    INNER JOIN fields AS qft ON qt.name = qft.type_name
+  UNION
+  SELECT 
+  	m.name AS module,
+  	'mutation' AS type_type,
+  	qt.name AS type_name,
+  	qft.name AS field_name,
+  	qft.description AS field_description, 
+  	qft.hugr_type,
+  	qft.catalog
+  FROM modules AS m
+    INNER JOIN types AS qt ON m.mutation_root = qt.name
+    INNER JOIN fields AS qft ON qt.name = qft.type_name
+  UNION
+  SELECT 
+  	m.name AS module,
+  	'function' AS type_type,
+  	qt.name AS type_name,
+  	qft.name AS field_name,
+  	qft.description AS field_description, 
+  	qft.hugr_type,
+  	qft.catalog
+  FROM modules AS m
+    INNER JOIN types AS qt ON m.function_root = qt.name
+    INNER JOIN fields AS qft ON qt.name = qft.type_name
+  UNION
+  SELECT 
+  	m.name AS module,
+  	'mut_function' AS type_type,
+  	qt.name AS type_name,
+  	qft.name AS field_name,
+  	qft.description AS field_description, 
+  	qft.hugr_type,
+  	qft.catalog
+  FROM modules AS m
+    INNER JOIN types AS qt ON m.mut_function_root = qt.name
+    INNER JOIN fields AS qft ON qt.name = qft.type_name
+  """
+) {
+  module: String! @field_references(
+    name: "module_intro_module_name_modules_name",
+    field: "name",
+    references_name: "modules",
+    query: "module_info",
+    description: "The name of the module",
+    references_query: "module_intro",
+    references_description: "The module types fields"
+  )
+  type_type: String!
+  type_name: String!
+  field_name: String!
+  field_description: String!
+  hugr_type: String!
+  catalog: String @field_references(
+    name: "module_intro_catalog_data_sources_name",
+    field: "name",
+    references_name: "data_sources",
+    query: "data_source",
+    description: "The catalog that the field belongs to",
+    references_query: "module_intro_in_catalog",
+    references_description: "Module intro fields that belong to this catalog"
+  )
+}
