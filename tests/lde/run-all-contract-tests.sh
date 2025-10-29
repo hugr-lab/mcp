@@ -68,11 +68,11 @@ echo "Total test suites:  $TOTAL_TESTS"
 echo -e "Passed suites:      ${GREEN}$PASSED_TESTS${NC}"
 echo -e "Failed suites:      ${RED}$FAILED_TESTS${NC}"
 
-if [ $FAILED_TESTS -eq 12 ] && [ $PASSED_TESTS -eq 0 ]; then
+if [ $FAILED_TESTS -eq $TOTAL_TESTS ] && [ $PASSED_TESTS -eq 0 ]; then
     echo -e "\n${YELLOW}✓ All tests failing as expected (TDD red phase)${NC}"
     echo -e "${YELLOW}  Ready to proceed with implementation (Phase 3.3)${NC}"
     exit 0
-elif [ $PASSED_TESTS -eq 12 ] && [ $FAILED_TESTS -eq 0 ]; then
+elif [ $PASSED_TESTS -eq $TOTAL_TESTS ] && [ $FAILED_TESTS -eq 0 ]; then
     echo -e "\n${GREEN}✓ All tests passing (TDD green phase)${NC}"
     echo -e "${GREEN}  Implementation complete!${NC}"
     exit 0

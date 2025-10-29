@@ -98,6 +98,10 @@ log_error() {
     echo -e "${RED}✗${NC} $1" >&2
 }
 
+log_warning() {
+    echo -e "${YELLOW}⚠${NC}  $1" >&2
+}
+
 log_verbose() {
     if [[ "$VERBOSE" == true ]]; then
         echo -e "${YELLOW}  [DEBUG]${NC} $1" >&2

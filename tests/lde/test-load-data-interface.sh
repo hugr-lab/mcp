@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # T006: Contract test for load-data.sh interface
-# Tests: --synthea-only, --openpayments-only, --force, --verbose, --help flags, exit codes
+# Tests: --skip-*, --force, --verbose, --help flags, exit codes
 # Expected: MUST FAIL until load-data.sh is implemented
 
 set -euo pipefail
@@ -93,8 +93,10 @@ if [ -f "$LOAD_DATA_SCRIPT" ] && [ -x "$LOAD_DATA_SCRIPT" ]; then
     OUTPUT=$("$LOAD_DATA_SCRIPT" --help 2>&1 || true)
 
     MISSING_FLAGS=""
-    echo "$OUTPUT" | grep -q -- "--synthea-only" || MISSING_FLAGS="$MISSING_FLAGS --synthea-only"
-    echo "$OUTPUT" | grep -q -- "--openpayments-only" || MISSING_FLAGS="$MISSING_FLAGS --openpayments-only"
+    echo "$OUTPUT" | grep -q -- "--skip-northwind" || MISSING_FLAGS="$MISSING_FLAGS --skip-northwind"
+    echo "$OUTPUT" | grep -q -- "--skip-synthea" || MISSING_FLAGS="$MISSING_FLAGS --skip-synthea"
+    echo "$OUTPUT" | grep -q -- "--skip-openpayments" || MISSING_FLAGS="$MISSING_FLAGS --skip-openpayments"
+    echo "$OUTPUT" | grep -q -- "--skip-owm" || MISSING_FLAGS="$MISSING_FLAGS --skip-owm"
     echo "$OUTPUT" | grep -q -- "--force" || MISSING_FLAGS="$MISSING_FLAGS --force"
     echo "$OUTPUT" | grep -q -- "--verbose\|^[[:space:]]*-v" || MISSING_FLAGS="$MISSING_FLAGS --verbose/-v"
     echo "$OUTPUT" | grep -q -- "--help" || MISSING_FLAGS="$MISSING_FLAGS --help"
@@ -156,31 +158,55 @@ else
     fail "Script does not exist"
 fi
 
-# Test 9: Script handles --synthea-only flag
-test_case "load-data.sh recognizes --synthea-only flag"
+# Test 9: Script handles --skip-northwind flag
+test_case "load-data.sh recognizes --skip-northwind flag"
 if [ -f "$LOAD_DATA_SCRIPT" ]; then
-    if grep -q -- "--synthea-only" "$LOAD_DATA_SCRIPT"; then
-        pass "Script handles --synthea-only flag"
+    if grep -q -- "--skip-northwind" "$LOAD_DATA_SCRIPT"; then
+        pass "Script handles --skip-northwind flag"
     else
-        fail "Script doesn't handle --synthea-only flag"
+        fail "Script doesn't handle --skip-northwind flag"
     fi
 else
     fail "Script does not exist"
 fi
 
-# Test 10: Script handles --openpayments-only flag
-test_case "load-data.sh recognizes --openpayments-only flag"
+# Test 10: Script handles --skip-synthea flag
+test_case "load-data.sh recognizes --skip-synthea flag"
 if [ -f "$LOAD_DATA_SCRIPT" ]; then
-    if grep -q -- "--openpayments-only" "$LOAD_DATA_SCRIPT"; then
-        pass "Script handles --openpayments-only flag"
+    if grep -q -- "--skip-synthea" "$LOAD_DATA_SCRIPT"; then
+        pass "Script handles --skip-synthea flag"
     else
-        fail "Script doesn't handle --openpayments-only flag"
+        fail "Script doesn't handle --skip-synthea flag"
     fi
 else
     fail "Script does not exist"
 fi
 
-# Test 11: Script handles --force flag
+# Test 11: Script handles --skip-openpayments flag
+test_case "load-data.sh recognizes --skip-openpayments flag"
+if [ -f "$LOAD_DATA_SCRIPT" ]; then
+    if grep -q -- "--skip-openpayments" "$LOAD_DATA_SCRIPT"; then
+        pass "Script handles --skip-openpayments flag"
+    else
+        fail "Script doesn't handle --skip-openpayments flag"
+    fi
+else
+    fail "Script does not exist"
+fi
+
+# Test 12: Script handles --skip-owm flag
+test_case "load-data.sh recognizes --skip-owm flag"
+if [ -f "$LOAD_DATA_SCRIPT" ]; then
+    if grep -q -- "--skip-owm" "$LOAD_DATA_SCRIPT"; then
+        pass "Script handles --skip-owm flag"
+    else
+        fail "Script doesn't handle --skip-owm flag"
+    fi
+else
+    fail "Script does not exist"
+fi
+
+# Test 13: Script handles --force flag
 test_case "load-data.sh recognizes --force flag"
 if [ -f "$LOAD_DATA_SCRIPT" ]; then
     if grep -q -- "--force" "$LOAD_DATA_SCRIPT"; then
@@ -192,7 +218,7 @@ else
     fail "Script does not exist"
 fi
 
-# Test 12: Script mentions data verification
+# Test 14: Script mentions data verification
 test_case "load-data.sh includes data verification"
 if [ -f "$LOAD_DATA_SCRIPT" ]; then
     if grep -qi "verif\|patient.*count\|record.*count" "$LOAD_DATA_SCRIPT"; then
@@ -204,7 +230,7 @@ else
     fail "Script does not exist"
 fi
 
-# Test 13: Script uses GraphQL mutations
+# Test 15: Script uses GraphQL mutations
 test_case "load-data.sh uses GraphQL API"
 if [ -f "$LOAD_DATA_SCRIPT" ]; then
     if grep -qi "graphql\|curl.*8080\|x-hugr-secret" "$LOAD_DATA_SCRIPT"; then

@@ -55,7 +55,7 @@ if curl -f -s http://localhost:8080/healthz > /dev/null 2>&1; then
     echo -e "${PASS} Hugr is running (continuing from T047)"
 else
     echo -e "${FAIL} Hugr is not running. Run test-synthea-generation.sh first!"
-    TEST_FAILED=1
+    echo -e "${YELLOW}⚠${NC} Skipping cleanup (environment not started by this test)"
     exit 1
 fi
 
@@ -64,13 +64,13 @@ if [ -f "${LDE_DIR}/.env" ]; then
     source "${LDE_DIR}/.env"
 else
     echo -e "${FAIL} .env file not found"
-    TEST_FAILED=1
+    echo -e "${YELLOW}⚠${NC} Skipping cleanup (environment not started by this test)"
     exit 1
 fi
 
 if [ -z "${SECRET_KEY:-}" ]; then
     echo -e "${FAIL} SECRET_KEY not set in .env"
-    TEST_FAILED=1
+    echo -e "${YELLOW}⚠${NC} Skipping cleanup (environment not started by this test)"
     exit 1
 fi
 

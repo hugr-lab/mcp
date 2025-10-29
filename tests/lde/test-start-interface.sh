@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # T004: Contract test for start.sh interface
-# Tests: --help, --reset, --no-data, --verbose flags, exit codes, output format
+# Tests: --help, --no-data, --verbose flags, exit codes, output format
 # Expected: MUST FAIL until start.sh is implemented
 
 set -euo pipefail
@@ -93,7 +93,6 @@ if [ -f "$START_SCRIPT" ] && [ -x "$START_SCRIPT" ]; then
     OUTPUT=$("$START_SCRIPT" --help 2>&1 || true)
 
     MISSING_FLAGS=""
-    echo "$OUTPUT" | grep -q -- "--reset" || MISSING_FLAGS="$MISSING_FLAGS --reset"
     echo "$OUTPUT" | grep -q -- "--no-data" || MISSING_FLAGS="$MISSING_FLAGS --no-data"
     echo "$OUTPUT" | grep -q -- "--verbose\|^[[:space:]]*-v" || MISSING_FLAGS="$MISSING_FLAGS --verbose/-v"
     echo "$OUTPUT" | grep -q -- "--help" || MISSING_FLAGS="$MISSING_FLAGS --help"
@@ -154,19 +153,7 @@ else
     fail "Script does not exist"
 fi
 
-# Test 9: Script handles --reset flag
-test_case "start.sh recognizes --reset flag"
-if [ -f "$START_SCRIPT" ]; then
-    if grep -q -- "--reset" "$START_SCRIPT"; then
-        pass "Script handles --reset flag"
-    else
-        fail "Script doesn't handle --reset flag"
-    fi
-else
-    fail "Script does not exist"
-fi
-
-# Test 10: Script handles --no-data flag
+# Test 9: Script handles --no-data flag
 test_case "start.sh recognizes --no-data flag"
 if [ -f "$START_SCRIPT" ]; then
     if grep -q -- "--no-data" "$START_SCRIPT"; then
@@ -178,7 +165,7 @@ else
     fail "Script does not exist"
 fi
 
-# Test 11: Script handles --verbose flag
+# Test 10: Script handles --verbose flag
 test_case "start.sh recognizes --verbose/-v flag"
 if [ -f "$START_SCRIPT" ]; then
     if grep -q -- "--verbose\|-v" "$START_SCRIPT"; then
