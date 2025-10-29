@@ -1,0 +1,53 @@
+# extend auto-generated Open Payments schema with the providers view
+
+type providers @table(name: "providers") {
+  npi: BigInt! @pk
+  last_name: String
+  first_name: String
+  total_general_count: Int
+  total_general_amount: Float
+  avg_general_amount: Float 
+  total_research_count: Int
+  total_research_amount: Float
+  avg_research_amount: Float
+  total_ownership_count: Int
+  total_invested_amount: Float
+  total_payments_amount: Float @sql(exp: "COALESCE(total_general_amount,0) + COALESCE(total_research_amount, 0)")
+}
+
+
+extend type general_payments {
+  Covered_Recipient_NPI: BigInt @field_references(
+    name: "general_payments_providers_npi"
+    references_name: "providers"
+    field: "npi"
+    query: "provider"
+    description: "NPI of the covered recipient physician"
+    references_query: "general_payments"
+    references_description: "General payments made to the covered recipient physician"
+  )
+}
+
+extend type research_payments {
+  Covered_Recipient_NPI: BigInt @field_references(
+    name: "research_payments_providers_npi"
+    references_name: "providers"
+    field: "npi"
+    query: "provider"
+    description: "NPI of the covered recipient physician"
+    references_query: "research_payments"
+    references_description: "Research payments made to the covered recipient physician"
+  )
+}
+
+extend type ownership_information {
+  Physician_NPI: BigInt @field_references(
+    name: "ownership_information_providers_npi"
+    references_name: "providers"
+    field: "npi"
+    query: "provider"
+    description: "NPI of the covered recipient physician"
+    references_query: "ownership_information"
+    references_description: "Ownership information of the covered recipient physician"
+  )
+}

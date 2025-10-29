@@ -1,0 +1,167 @@
+# Docker Compose Contract: Local Development Environment
+# This contract defines the expected structure and behavior of docker-compose.yml
+
+version: "3.9"
+
+# Required services (contract expectations)
+services:
+  # Hugr GraphQL Service
+  hugr:
+    required_fields:
+      - image
+      - ports
+      - environment
+      - depends_on
+      - healthcheck
+    ports:
+      - format: "HOST:CONTAINER"
+        example: "8080:8080"
+        required: ["8080:8080"]
+    environment:
+      required:
+        - DATABASE_URL
+        - REDIS_URL
+        - S3_ENDPOINT
+        - KEYCLOAK_URL
+        - KEYCLOAK_REALM
+    depends_on:
+      required_services:
+        - postgres
+        - redis
+        - minio
+        - keycloak
+      required_conditions:
+        - service_healthy
+    healthcheck:
+      required_fields:
+        - test
+        - interval
+        - timeout
+        - retries
+
+  # PostgreSQL Database
+  postgres:
+    required_fields:
+      - image
+      - environment
+      - volumes
+      - healthcheck
+    environment:
+      required:
+        - POSTGRES_USER
+        - POSTGRES_PASSWORD
+        - POSTGRES_DB
+    volumes:
+      format: "HOST_PATH:CONTAINER_PATH"
+      required_pattern: ".local/pg-data:/var/lib/postgresql/data"
+    healthcheck:
+      test_command: "pg_isready -U hugr"
+
+  # Redis Cache
+  redis:
+    required_fields:
+      - image
+      - command
+      - volumes
+      - healthcheck
+    command:
+      pattern: "redis-server --appendonly yes"
+    volumes:
+      required_pattern: ".local/redis-data:/data"
+    healthcheck:
+      test_command: "redis-cli ping"
+
+  # MinIO Object Storage
+  minio:
+    required_fields:
+      - image
+      - command
+      - environment
+      - ports
+      - volumes
+      - healthcheck
+    ports:
+      required:
+        - "9000:9000"
+        - "9001:9001"
+    environment:
+      required:
+        - MINIO_ROOT_USER
+        - MINIO_ROOT_PASSWORD
+    volumes:
+      required_pattern: ".local/minio:/data"
+
+  # Keycloak Authentication
+  keycloak:
+    required_fields:
+      - image
+      - command
+      - environment
+      - ports
+      - volumes
+      - healthcheck
+    ports:
+      required:
+        - "8180:8080"
+    environment:
+      required:
+        - KEYCLOAK_ADMIN
+        - KEYCLOAK_ADMIN_PASSWORD
+        - KC_HTTP_PORT
+    volumes:
+      required:
+        - "keycloak/realm-config.json:/opt/keycloak/data/import/realm.json"
+        - ".local/keycloak:/opt/keycloak/data/h2"
+
+# Test Contract: Validate docker-compose.yml structure
+test_contract:
+  name: "docker-compose structure validation"
+  steps:
+    - name: "Validate YAML syntax"
+      command: "docker compose config > /dev/null 2>&1"
+      expected_exit_code: 0
+
+    - name: "Verify all required services defined"
+      command: "docker compose config --services | sort"
+      expected_output:
+        contains:
+          - "hugr"
+          - "postgres"
+          - "redis"
+          - "minio"
+          - "keycloak"
+
+    - name: "Verify service dependencies"
+      command: "docker compose config | yq '.services.hugr.depends_on'"
+      expected_output:
+        contains_all:
+          - "postgres"
+          - "redis"
+          - "minio"
+          - "keycloak"
+
+    - name: "Verify health checks configured"
+      description: "All services must have healthcheck defined"
+      services_with_healthcheck:
+        - hugr
+        - postgres
+        - redis
+        - minio
+        - keycloak
+
+    - name: "Verify volume persistence"
+      description: "All volumes must use .local directory"
+      command: "docker compose config | grep -c '.local/'"
+      expected_minimum: 4
+
+    - name: "Verify port exposures"
+      description: "Essential ports must be exposed to host"
+      required_ports:
+        - "8080"  # Hugr GraphQL
+        - "8180"  # Keycloak
+        - "9000"  # MinIO API
+        - "9001"  # MinIO Console
+
+# Validation Script Reference
+validation_script: tests/lde/test-scripts.sh
+integration_test: tests/lde/test-services.sh

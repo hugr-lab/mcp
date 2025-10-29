@@ -1,0 +1,76 @@
+extend type Function {
+  "Current weather from OpenWeatherMap in raw format"
+  current_weather_raw(lat: Float!, lon: Float!): JSON
+    @function(
+      name: "get_current_weather_raw"
+      sql: "http_data_source_request_scalar([$catalog], '/data/2.5/weather', 'GET', '{}'::JSON, {lat: [lat], lon: [lon], units: 'metric'}::JSON, '{}'::JSON, '')"
+      json_cast: true
+    )
+
+  "Current weather from OpenWeatherMap in raw format"
+  current_weather(lat: Float!, lon: Float!): current_weather_response
+    @function(
+      name: "get_current_weather"
+      sql: "http_data_source_request_scalar([$catalog], '/data/2.5/weather', 'GET', '{}'::JSON, {lat: [lat], lon: [lon], units: 'metric'}::JSON, '{}'::JSON, '')"
+      json_cast: true
+    )
+}
+
+type current_weather_response {
+  id: Int
+  name: String
+  base: String
+  coord: coords
+  dt: BigInt
+  main: main_weather_info
+  weather: [weather_conditions]
+  clouds: clouds_info
+  rain: perc_info
+  snow: perc_info
+  visibility: Int
+  wind: wind_info
+  common: sys_info @field_source(field: "sys")
+}
+
+type coords {
+  lat: Float
+  lon: Float
+}
+
+type clouds_info {
+  all: Float
+}
+
+type perc_info {
+  current: Float @field_source(field: "1h")
+}
+
+type wind_info {
+  speed: Float
+  deg: Float
+  gust: Float
+}
+
+type main_weather_info {
+  feels_like: Float
+  grnd_level: Float
+  humidity: Float
+  pressure: Float
+  sea_level: Float
+  temp: Float
+  temp_max: Float
+  temp_min: Float
+}
+
+type weather_conditions {
+  id: Int
+  name: String @field_source(field: "main")
+  icon: String
+  description: String
+}
+
+type sys_info {
+  sunrise: BigInt
+  sunset: BigInt
+  country: String
+}

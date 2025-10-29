@@ -1,0 +1,329 @@
+# Customers
+type customers @table(name: "customers") {
+  id: String! @pk @field_source(field: "customer_id")
+  company_name: String!
+  contact_name: String!
+  contact_title: String
+  address: String
+  city: String
+  region: String
+  postal_code: String
+  country: String
+  phone: String
+  fax: String
+}
+
+# Customers Demo
+type customers_types @table(name: "customer_demographics") {
+  id: String! @pk @field_source(field: "customer_type_id")
+  description: String! @field_source(field: "customer_desc")
+}
+
+# Customers Linked Types
+type customers_linked_types @table(name: "customer_customer_demo", is_m2m: true) {
+  customer_id: String! @pk @field_references(
+    name: "customers_linked_types_customer_id"
+    references_name: "customers"
+    field: "id"
+    query: "customer"
+    description: "Customer"
+    references_query: "types"
+    references_description: "Linked customer types"
+  )
+  type_id: String! @pk @field_source(field: "customer_type_id")
+    @field_references(
+      name: "customers_linked_types_type_id"
+      references_name: "customers_types"
+      field: "id"
+      query: "type"
+      description: "Customer type"
+      references_query: "customers"
+      references_description: "Linked customers"
+    )
+}
+
+
+# Shippers
+type shippers @table(name: "shippers") {
+  id: Int! @pk @field_source(field: "shipper_id")
+  company_name: String!
+  phone: String
+}
+
+# Suppliers
+type suppliers @table(name: "suppliers") {
+  id: Int! @pk @field_source(field: "supplier_id")
+  company_name: String!
+  contact_name: String
+  contact_title: String
+  address: String
+  city: String
+  region: String
+  postal_code: String
+  country: String
+  phone: String
+  fax: String
+}
+
+# Products categories
+type categories @table(name: "categories") {
+  id: Int! @pk @field_source(field: "category_id")
+  name: String! @field_source(field: "category_name")
+  description: String
+  picture: String
+}
+
+# Products
+type products @table(name: "products") {
+  id: Int! @pk @field_source(field: "product_id")
+  name: String! @field_source(field: "product_name")
+  supplier_id: Int! @field_references(
+    name: "products_supplier_id"
+    references_name: "suppliers"
+    field: "id"
+    query: "supplier"
+    description: "Supplier"
+    references_query: "products"
+    references_description: "Supplied products"
+  )
+  category_id: Int! @field_references(
+    name: "products_category_id"
+    references_name: "categories"
+    field: "id"
+    query: "category"
+    description: "Category"
+    references_query: "products"
+    references_description: "Products"
+  )
+  quantity_per_unit: String
+  unit_price: Float
+  units_in_stock: Int
+  units_on_order: Int
+  reorder_level: Int
+  discontinued: Boolean!
+}
+
+# Employees
+type employees @table(name: "employees") {
+  id: Int! @pk @field_source(field: "employee_id")
+  last_name: String!
+  first_name: String!
+  title: String
+  title_of_courtesy: String
+  birth_date: String
+  hire_date: String
+  address: String
+  city: String
+  region: String
+  postal_code: String
+  country: String
+  home_phone: String
+  extension: String
+  photo: String
+  notes: String
+  reports_to: Int @field_references(
+    name: "employees_reports_to"
+    references_name: "employees"
+    field: "id"
+    query: "reportsTo"
+    description: "Reports to employee"
+    references_query: "employees"
+    references_description: "Employees reporting to this employee"
+  )
+}
+
+# Regions
+type regions @table(name: "regions") {
+  id: Int! @pk @field_source(field: "region_id")
+  description: String!
+}
+
+# Territories
+type territories @table(name: "territories") {
+  id: Int! @pk @field_source(field: "territory_id")
+  name: String!
+  region_id: Int! @field_references(
+    name: "territories_region_id"
+    references_name: "regions"
+    field: "id"
+    query: "region"
+    description: "Region"
+    references_query: "territories"
+    references_description: "Territories in this region"
+  )
+}
+
+# Employee territories
+type employee_territories @table(name: "employee_territories", is_m2m: true) {
+  employee_id: Int! @pk @field_references(
+    name: "employee_territories_employee_id"
+    references_name: "employees"
+    field: "id"
+    query: "employee"
+    description: "Employee"
+    references_query: "territories"
+    references_description: "Territories assigned to this employee"
+  )
+  territory_id: Int! @pk @field_source(field: "territory_id")
+    @field_references(
+      name: "employee_territories_territory_id"
+      references_name: "territories"
+      field: "id"
+      query: "territory"
+      description: "Territory"
+      references_query: "employees"
+      references_description: "Employees assigned to this territory"
+    )
+}
+
+# Orders
+type orders @table(name: "orders") {
+  id: Int! @pk @field_source(field: "order_id")
+  customer_id: String! @field_references(
+    name: "orders_customer_id"
+    references_name: "customers"
+    field: "id"
+    query: "customer"
+    description: "Customer"
+    references_query: "orders"
+    references_description: "Orders placed by this customer"
+  )
+  employee_id: Int! @field_references(
+    name: "orders_employee_id"
+    references_name: "employees"
+    field: "id"
+    query: "employee"
+    description: "Employee"
+    references_query: "orders"
+    references_description: "Orders handled by this employee"
+  )
+  order_date: Timestamp
+  required_date: Timestamp
+  shipped_date: Timestamp
+  ship_via: Int @field_references(
+    name: "orders_ship_via"
+    references_name: "shippers"
+    field: "id"
+    query: "shipper"
+    description: "Shipper"
+    references_query: "orders"
+    references_description: "Orders shipped by this shipper"
+  )
+  freight: Float
+  ship_name: String
+  ship_address: String
+  ship_city: String
+  ship_region: String
+  ship_postal_code: String
+  ship_country: String
+}
+
+# Order details
+type order_details @table(name: "order_details") {
+  order_id: Int! @pk @field_references(
+    name: "order_details_order_id"
+    references_name: "orders"
+    field: "id"
+    query: "order"
+    description: "Order"
+    references_query: "details"
+    references_description: "Details of this order"
+  )
+  product_id: Int! @pk @field_references(
+    name: "order_details_product_id"
+    references_name: "products"
+    field: "id"
+    query: "product"
+    description: "Product"
+    references_query: "orders"
+    references_description: "Details of this product in the order"
+  )
+  unit_price: Float!
+  quantity: Int!
+  discount: Float!
+  # Calculated total amount of ordered product
+  total: Float! @sql(exp: "round(([unit_price] * [quantity] * (1 - [discount]))*100)/100")
+}
+
+# Shipped products view
+type shipped_products_view 
+  @view(
+    name: "shipped_products"
+    sql: """
+    SELECT 
+      orders.customer_id,
+      orders.employee_id,
+      orders.order_date,
+      orders.shipped_date,
+      orders.ship_via,
+      order_details.product_id,
+      order_details.unit_price,
+      order_details.quantity,
+      order_details.discount,
+      products.supplier_id,
+      products.category_id
+    FROM orders
+        INNER JOIN order_details ON orders.order_id = order_details.order_id
+        INNER JOIN products ON order_details.product_id = products.product_id
+WHERE orders.shipped_date IS NOT NULL
+    """
+  ) 
+{
+  customer_id: String! @field_references(
+    name: "shipped_products_view_customer_id"
+    references_name: "customers"
+    field: "id"
+    query: "customer"
+    description: "Customer"
+    references_query: "shippedProducts"
+    references_description: "Shipped products for this customer"
+  )
+  employee_id: Int! @field_references(
+    name: "shipped_products_view_employee_id"
+    references_name: "employees"
+    field: "id"
+    query: "employee"
+    description: "Employee"
+    references_query: "shippedProducts"
+    references_description: "Shipped products handled by this employee"
+  )
+  order_date: Timestamp
+  shipped_date: Timestamp
+  ship_via: Int @field_references(
+    name: "shipped_products_view_ship_via"
+    references_name: "shippers"
+    field: "id"
+    query: "shipper"
+    description: "Shipper"
+    references_query: "shippedProducts"
+    references_description: "Shipped products by this shipper"
+  )
+  product_id: Int! @field_references(
+    name: "shipped_products_view_product_id"
+    references_name: "products"
+    field: "id"
+    query: "product"
+    description: "Product"
+    references_query: "shippedProducts"
+    references_description: "Shipped product details in this order"
+  )
+  unit_price: Float!
+  quantity: Int!
+  discount: Float!
+  supplier_id: Int! @field_references(
+    name: "shipped_products_view_supplier_id"
+    references_name: "suppliers"
+    field: "id"
+    query: "supplier"
+    description: "Supplier of the product in the order details view."
+  )
+  category_id: Int! @field_references(
+    name: "shipped_products_view_category_id"
+    references_name: "categories"
+    field: "id"
+    query: "category"
+    description:
+      "Category of the product in the order details view."
+  )
+  total: Float! @sql(exp: "round(([unit_price] * [quantity] * (1 - [discount]))*100)/100")
+}

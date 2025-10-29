@@ -1,0 +1,133 @@
+{
+  "realm": "hugr",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Full administrative access to all Hugr features"
+      },
+      {
+        "name": "viewer",
+        "description": "Read-only access to Hugr data"
+      },
+      {
+        "name": "analyst",
+        "description": "Data analysis access with query capabilities"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin@example.com",
+      "email": "admin@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "attributes": {
+        "hugr-role": ["admin"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "viewer@example.com",
+      "email": "viewer@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Viewer",
+      "lastName": "User",
+      "attributes": {
+        "hugr-role": ["viewer"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["viewer"]
+    },
+    {
+      "username": "analyst@example.com",
+      "email": "analyst@example.com",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Analyst",
+      "lastName": "User",
+      "attributes": {
+        "hugr-role": ["analyst"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "analyst123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["analyst"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "hugr-graphql",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:19000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:19000"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "hugr-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "hugr-role",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "x-hugr-role",
+            "jsonType.label": "String",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "name-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "name",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ]
+}

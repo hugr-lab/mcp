@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: OpenWeatherMap
+  version: 0.0.1
+servers:
+  - url: https://api.openweathermap.org
+    description: OpenWeatherMap
+components:
+  securitySchemes:
+    owm:
+      type: apiKey
+      description: API key authentication
+      in: query
+      name: appid
+  schemas:
+    current_weather:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        base:
+          type: string
+        coord:
+          type: object
+          properties:
+            lat:
+              type: number
+            lon:
+              type: number
+        dt:
+          type: integer
+          x-hugr-type:
+            type: Timestamp
+            transform: "FromUnixTime"
+        weather:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              icon:
+                type: string
+              description:
+                type: string
+              main:
+                type: string
+        clouds:
+          type: object
+          properties:
+            all:
+              type: integer
+        rain:
+          $ref: "#/components/schemas/perc_info"
+        snow:
+          $ref: "#/components/schemas/perc_info"
+        visibility:
+          type: integer
+        wind:
+          type: object
+          properties:
+            speed:
+              type: number
+            deg:
+              type: number
+            gust:
+              type: number
+        main:
+          type: object
+          properties:
+            temp:
+              type: number
+            feels_like:
+              type: number
+            temp_min:
+              type: number
+            temp_max:
+              type: number
+            humidity:
+              type: number
+            pressure:
+              type: number
+            grnd_level:
+              type: number
+            sea_level:
+              type: number
+        sys:
+          type: object
+          x-hugr-name: "common"
+          properties:
+            country:
+              type: string
+            sunrise:
+              type: integer
+              x-hugr-type:
+                type: Timestamp
+                transform: "FromUnixTime"
+            sunset:
+              type: integer
+              x-hugr-type:
+                type: Timestamp
+                transform: "FromUnixTime"
+    perc_info:
+      type: object
+      properties:
+        1h:
+          type: number
+          x-hugr-name: current
+paths:
+  /data/2.5/weather:
+    get:
+      description: Current weather from OpenWeatherMap
+      operationId: current
+      parameters:
+        - name: lat
+          description: Latitude of the location
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          description: Longitude of the location
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/current_weather"
