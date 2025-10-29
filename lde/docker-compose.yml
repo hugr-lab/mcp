@@ -1,0 +1,171 @@
+services:
+  # PostgreSQL Database with TimescaleDB and pgvector support
+  postgres:
+    image: ${POSTGRES_IMAGE:-timescale/timescaledb-ha:pg16}
+    container_name: lde-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-hugr}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-hugr}
+      - POSTGRES_DB=${POSTGRES_DB:-hugr}
+    ports:
+      - "19001:5432"
+    volumes:
+      - ./.local/pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hugr}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache with persistence
+  redis:
+    image: ${REDIS_IMAGE:-redis:8-alpine}
+    container_name: lde-redis
+    command: redis-server --appendonly yes --maxmemory 20gb --maxmemory-policy allkeys-lru
+    ports:
+      - "19002:6379"
+    volumes:
+      - ./.local/redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 20G
+
+  # MinIO Object Storage (S3-compatible)
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:latest}
+    container_name: lde-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "19003:9000"
+      - "19004:9001"
+    volumes:
+      - ./.local/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Keycloak Authentication Server with realm import
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.0}
+    container_name: lde-keycloak
+    command: ["start-dev", "--http-relative-path=/", "--import-realm", "--http-port=8080"]
+    environment:
+      - KC_HEALTH_ENABLED=true
+      - KC_HOSTNAME_PORT=${KEYCLOAK_PORT:-19005}
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_STRICT_HTTPS=false
+      - KC_HTTP_ENABLED=true
+      - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_ADMIN:-admin}
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_DB=dev-file
+    ports:
+      - "19005:8080"
+    volumes:
+      - ./keycloak/realm-config.json:/opt/keycloak/data/import/realm.json:ro
+      - ./keycloak/HealthCheck.java:/opt/keycloak/HealthCheck.java:ro
+      - ./.local/keycloak:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "java /opt/keycloak/HealthCheck.java http://localhost:9000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # Hugr GraphQL Service
+  hugr:
+    image: ${HUGR_IMAGE:-ghcr.io/hugr-lab/automigrate:v0.1.34}
+    container_name: lde-hugr
+    models:
+      - embeddings
+      - summarize
+    environment:
+      # Server settings
+      - BIND=:15000
+      - SERVICE_BIND=:14000
+      - DEBUG=${DEBUG:-true}
+      - ADMIN_UI=${ADMIN_UI:-true}
+      - ALLOW_PARALLEL=true
+      - MAX_PARALLEL_QUERIES=${MAX_PARALLEL_QUERIES:-10}
+      - MAX_DEPTH=10
+      # Core database (DuckDB file)
+      - DB_HOME_DIRECTORY=/hugr-data
+      - CORE_DB_PATH=/hugr-data/core.duckdb
+      # L2 Cache (Redis)
+      - L2_CACHE_ENABLED=true
+      - L2_CACHE_TYPE=redis
+      - L2_CACHE_REDIS_ADDR=redis:6379
+      - L2_CACHE_TTL=3600
+      # Authentication
+      - ALLOWED_ANONYMOUS=${ALLOWED_ANONYMOUS:-true}
+      - ANONYMOUS_ROLE=${ANONYMOUS_ROLE:-admin}
+      - SECRET_KEY=${SECRET_KEY:-local-dev-secret-key-change-in-production}
+      # OIDC Authentication
+      - OIDC_ISSUER=${OIDC_ISSUER:-http://keycloak:8080/realms/hugr}
+      - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:-hugr-graphql}
+      - OIDC_CLIENT_TIMEOUT=${OIDC_CLIENT_TIMEOUT:-5s}
+      - OIDC_TLS_INSECURE=${OIDC_TLS_INSECURE:-true}
+      - OIDC_COOKIE_NAME=${OIDC_COOKIE_NAME:-}
+      - OIDC_SCOPE_ROLE_PREFIX=${OIDC_SCOPE_ROLE_PREFIX:-}
+      - OIDC_USERNAME_CLAIM=${OIDC_USERNAME_CLAIM:-name}
+      - OIDC_USERID_CLAIM=${OIDC_USERID_CLAIM:-sub}
+      - OIDC_ROLE_CLAIM=${OIDC_ROLE_CLAIM:-x-hugr-role}
+    ports:
+      - "19000:15000"  # GraphQL endpoint
+      - "19006:14000"  # Metrics/health endpoint
+    volumes:
+      - ./data:/hugr-data
+      - ./data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:14000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 20G
+
+networks:
+  default:
+    name: lde-network
+
+# AI Models configuration
+models:
+  # Text summarization model (21B parameters, ~3.6B active per token)
+  summarize:
+    model: ai/gpt-oss:latest
+    context_size: 8192
+    runtime_flags:
+      - --temperature=0.7
+      - --max-tokens=2048
+
+  # Text embedding model (308M parameters, Google DeepMind)
+  embeddings:
+    model: ai/embeddinggemma:latest
+    context_size: 2048

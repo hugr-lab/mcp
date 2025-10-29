@@ -1,0 +1,46 @@
+# Hugr Authentication Configuration
+# This file configures authentication providers for the local development environment
+
+# Anonymous access (enabled for testing, set to false in production)
+anonymous:
+  allowed: true
+  role: "admin"
+
+# OIDC Authentication (Keycloak)
+# OIDC automatically fetches public keys from the .well-known endpoint
+# Supports both cookie-based (browser) and Bearer token (API) authentication
+oidc:
+  issuer: "http://keycloak:8080/realms/hugr"
+  client_id: "hugr-graphql"
+  timeout: "5s"
+  tls_insecure: true
+  # cookie_name: "hugr_oidc"  # Commented out to make cookies optional
+  scope_role_prefix: ""
+  claims:
+    role: "x-hugr-role"
+    user_id: "sub"
+    user_name: "name"
+
+# Secret key for administrative access (data loading scripts)
+secret_key: "local-dev-secret-key-change-in-production"
+
+# API Keys for script access
+api_keys:
+  admin_key:
+    key: "local-dev-secret-key-change-in-production"
+    header: "x-hugr-secret"
+    default_role: "admin"
+    headers:
+      role: "x-hugr-role"
+      user_id: "x-hugr-user-id"
+      user_name: "x-hugr-user-name"
+
+# Login and redirect URLs
+login_url: "/login"
+redirect_url: "/"
+redirect_login_paths:
+  - "/login"
+  - "/auth"
+
+# Managed API keys
+managed_api_keys: false

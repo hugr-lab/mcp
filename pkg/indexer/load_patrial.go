@@ -81,6 +81,11 @@ func (s *Service) LoadDataSource(ctx context.Context, name string) error {
 }
 
 func (s *Service) LoadModule(ctx context.Context, name string) error {
+	// 1. Fetch schema and summary
+	// 2. Get all data objects and functions for the module
+	// 2. Clear module, data objects and functions types, fields, arguments if needed
+	// 3. Load functions, data objects and modules types, fields, arguments
+
 	return nil
 }
 
