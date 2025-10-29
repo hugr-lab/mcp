@@ -45,7 +45,7 @@ These tests follow Test-Driven Development (TDD) principles: they were written *
 | **T011** | `test-compose-healthchecks.sh` | 125 | 7 test cases |
 | **T012** | `test-compose-volumes.sh` | 158 | 10 test cases |
 | **T013** | `test-compose-ports.sh` | 146 | 9 test cases |
-| **T014** | `test-compose-env.sh** | 197 | 14 test cases |
+| **T014** | `test-compose-env.sh` | 197 | 14 test cases |
 | **T015** | `test-compose-keycloak.sh` | 159 | 9 test cases |
 
 **Total**: 8 files, 1,173 lines, 73 test cases
