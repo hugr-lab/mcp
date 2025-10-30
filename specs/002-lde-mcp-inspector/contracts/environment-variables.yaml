@@ -1,0 +1,108 @@
+# Contract: MCP Inspector Environment Variables
+# Feature: 002-lde-mcp-inspector
+# Date: 2025-10-30
+
+# This file defines the contract for MCP Inspector environment variables
+# in lde/.env.example
+
+variables:
+  - name: MCP_INSPECTOR_IMAGE
+    type: string
+    required: yes
+    default: "ghcr.io/modelcontextprotocol/inspector:latest"
+    description: "Docker image for MCP Inspector service"
+    validation:
+      pattern: "^ghcr\\.io/modelcontextprotocol/inspector:.+"
+      example: "ghcr.io/modelcontextprotocol/inspector:latest"
+    usage:
+      - file: "lde/docker-compose.yml"
+        context: "services.mcp-inspector.image"
+
+  - name: MCP_INSPECTOR_PORT
+    type: integer
+    required: yes
+    default: 19007
+    description: "Host port for MCP Inspector UI and proxy"
+    validation:
+      min: 19000
+      max: 19020
+      not_in_use: [19000, 19001, 19002, 19003, 19004, 19005, 19006]
+    usage:
+      - file: "lde/docker-compose.yml"
+        context: "services.mcp-inspector.ports"
+      - file: "lde/README.md"
+        context: "Service access URLs"
+
+  - name: MCP_INSPECTOR_HOST
+    type: string
+    required: yes
+    default: "0.0.0.0"
+    description: "Network interface binding for Inspector service"
+    validation:
+      allowed_values: ["0.0.0.0", "localhost", "127.0.0.1"]
+      note: "0.0.0.0 allows remote access, localhost restricts to local only"
+    usage:
+      - file: "lde/docker-compose.yml"
+        context: "services.mcp-inspector.environment.HOST"
+
+  - name: MCP_INSPECTOR_ALLOWED_ORIGINS
+    type: string
+    required: yes
+    default: "http://localhost:19007"
+    description: "CORS allowed origins (comma-separated)"
+    validation:
+      format: "URL list, comma-separated"
+      example: "http://localhost:19007,http://localhost:19005"
+    usage:
+      - file: "lde/docker-compose.yml"
+        context: "services.mcp-inspector.environment.ALLOWED_ORIGINS"
+
+documentation:
+  location: "lde/.env.example"
+  format: |
+    # MCP Inspector
+    MCP_INSPECTOR_IMAGE=ghcr.io/modelcontextprotocol/inspector:latest
+    MCP_INSPECTOR_PORT=19007
+    MCP_INSPECTOR_HOST=0.0.0.0
+    MCP_INSPECTOR_ALLOWED_ORIGINS=http://localhost:19007
+
+  section_header: "MCP Inspector"
+  placement: "After Keycloak section, before any custom additions"
+  comments:
+    - "MCP Inspector provides web-based testing and debugging for MCP servers"
+    - "Access at: http://localhost:${MCP_INSPECTOR_PORT}"
+
+test_validation:
+  - test_name: "All variables present in .env.example"
+    command: "grep -E '^MCP_INSPECTOR_' lde/.env.example"
+    expected_count: 4
+    expected_variables:
+      - "MCP_INSPECTOR_IMAGE"
+      - "MCP_INSPECTOR_PORT"
+      - "MCP_INSPECTOR_HOST"
+      - "MCP_INSPECTOR_ALLOWED_ORIGINS"
+
+  - test_name: "Variables have valid default values"
+    validations:
+      - var: "MCP_INSPECTOR_IMAGE"
+        check: "contains 'ghcr.io/modelcontextprotocol/inspector'"
+      - var: "MCP_INSPECTOR_PORT"
+        check: "equals 19007"
+      - var: "MCP_INSPECTOR_HOST"
+        check: "equals 0.0.0.0"
+      - var: "MCP_INSPECTOR_ALLOWED_ORIGINS"
+        check: "contains 'http://localhost:19007'"
+
+  - test_name: "Section has header comment"
+    command: "grep -B1 'MCP_INSPECTOR_IMAGE' lde/.env.example"
+    expected_output_contains: "# MCP Inspector"
+
+cross_references:
+  - file: "lde/docker-compose.yml"
+    relationship: "Variables used in service definition"
+
+  - file: "lde/README.md"
+    relationship: "Port documented in service access section"
+
+  - file: "README.md"
+    relationship: "MCP Inspector mentioned in services list"

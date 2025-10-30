@@ -1,0 +1,201 @@
+# Contract: LDE Script Interfaces for MCP Inspector
+# Feature: 002-lde-mcp-inspector
+# Date: 2025-10-30
+
+# This file defines contracts for how MCP Inspector integrates with LDE lifecycle scripts
+
+scripts:
+  - name: start.sh
+    path: "lde/scripts/start.sh"
+    modifications:
+      - location: "docker compose up command"
+        change: "Includes mcp-inspector service automatically"
+        requirement: "MCP Inspector must start with other services"
+        test: "Service appears in 'docker compose ps' output after start"
+
+      - location: "Service count validation"
+        change: "Update from 5 to 6 services"
+        requirement: "Health check wait logic accounts for 6 services"
+        test: "Health check expects 6/6 services healthy"
+
+      - location: "Success message"
+        change: "Include MCP Inspector in services list"
+        requirement: "User informed that Inspector is available"
+        test: "Start output contains 'MCP Inspector' and access URL"
+
+    behavior:
+      command: "./lde/scripts/start.sh"
+      expected_actions:
+        - "Create .local/mcp-inspector directory if not exists"
+        - "Start mcp-inspector service via docker compose"
+        - "Verify mcp-inspector container running"
+        - "Display MCP Inspector access URL (http://localhost:19007)"
+      exit_codes:
+        0: "All services including MCP Inspector started successfully"
+        2: "Docker compose failure (includes Inspector)"
+        3: "Health checks failed (includes Inspector)"
+
+  - name: stop.sh
+    path: "lde/scripts/stop.sh"
+    modifications:
+      - location: "docker compose stop command"
+        change: "Includes mcp-inspector service automatically"
+        requirement: "MCP Inspector must stop with other services"
+        test: "Container not in 'docker ps' after stop"
+
+    behavior:
+      command: "./lde/scripts/stop.sh"
+      expected_actions:
+        - "Stop mcp-inspector container gracefully"
+        - "Preserve .local/mcp-inspector data"
+      exit_codes:
+        0: "All services including MCP Inspector stopped"
+
+  - name: health-check.sh
+    path: "lde/scripts/health-check.sh"
+    modifications:
+      - location: "Service status variables"
+        change: "Add MCP_INSPECTOR_STATUS, MCP_INSPECTOR_TIME, MCP_INSPECTOR_ERROR"
+        requirement: "Track Inspector health state"
+        test: "Variables set after check_all_services()"
+
+      - location: "check functions"
+        change: "Add check_mcp_inspector() function"
+        requirement: "Verify container running status"
+        implementation: |
+          check_mcp_inspector() {
+              local start_time=$(perl -MTime::HiRes -e 'printf("%.0f",Time::HiRes::time()*1000)')
+
+              if docker ps --filter "name=lde-mcp-inspector" --filter "status=running" --format "{{.Names}}" | grep -q "lde-mcp-inspector"; then
+                  local end_time=$(perl -MTime::HiRes -e 'printf("%.0f",Time::HiRes::time()*1000)')
+                  local response_time=$((end_time - start_time))
+                  MCP_INSPECTOR_STATUS="healthy"
+                  MCP_INSPECTOR_TIME="${response_time}ms"
+                  return 0
+              else
+                  MCP_INSPECTOR_STATUS="unhealthy"
+                  MCP_INSPECTOR_ERROR="Container not running"
+                  return 1
+              fi
+          }
+        test: "Function returns 0 when container running, 1 otherwise"
+
+      - location: "check_all_services function"
+        change: "Add check_mcp_inspector call"
+        requirement: "Inspector checked with other services"
+        test: "MCP_INSPECTOR_STATUS set after check_all_services"
+
+      - location: "display_status function"
+        change: "Add MCP Inspector to service list, update total from 5 to 6"
+        requirement: "Inspector status displayed with other services"
+        format: |
+          # MCP Inspector
+          if [[ "${MCP_INSPECTOR_STATUS}" == "healthy" ]]; then
+              echo -e "  MCP Inspector: ${GREEN}✓ Healthy${NC} (Response: ${MCP_INSPECTOR_TIME})"
+              ((healthy++))
+          else
+              echo -e "  MCP Inspector: ${RED}✗ Unhealthy${NC} (${MCP_INSPECTOR_ERROR})"
+          fi
+        test: "Output contains 'MCP Inspector' line"
+
+      - location: "wait_for_healthy function"
+        change: "Update healthy service count from 5 to 6"
+        requirement: "Wait mode expects 6 services"
+        test: "Loop exits when healthy=6"
+
+      - location: "Help text"
+        change: "Add MCP Inspector to Services Checked list"
+        requirement: "Documentation reflects 6 services"
+        test: "--help output contains MCP Inspector"
+
+    behavior:
+      command: "./lde/scripts/health-check.sh"
+      expected_output:
+        success: |
+          Service Health Status:
+
+            PostgreSQL:    ✓ Healthy (Response: 15ms)
+            Redis:         ✓ Healthy (Response: 12ms)
+            MinIO:         ✓ Healthy (Response: 45ms)
+            Keycloak:      ✓ Healthy (Response: 120ms)
+            Hugr:          ✓ Healthy (Response: 28ms)
+            MCP Inspector: ✓ Healthy (Response: 8ms)
+
+          All Services Healthy (6/6)
+        failure: |
+          Service Health Status:
+
+            [other services...]
+            MCP Inspector: ✗ Unhealthy (Container not running)
+
+          Health Check Failed (5/6 healthy)
+      exit_codes:
+        0: "All 6 services healthy"
+        1: "One or more services unhealthy"
+
+  - name: cleanup.sh
+    path: "lde/scripts/cleanup.sh"
+    modifications:
+      - location: "clear_local function"
+        change: "No change required - .local/mcp-inspector removed automatically"
+        requirement: ".local/ cleanup includes Inspector data"
+        test: ".local/mcp-inspector does not exist after cleanup"
+
+      - location: "show_warning function"
+        change: "Add MCP Inspector to .local/ directory contents list"
+        requirement: "User informed about Inspector data deletion"
+        addition: |
+          echo "     - MCP Inspector test history"
+        test: "Warning output contains 'MCP Inspector test history'"
+
+    behavior:
+      command: "./lde/scripts/cleanup.sh"
+      expected_actions:
+        - "Remove .local/mcp-inspector directory"
+        - "Remove mcp-inspector container"
+      with_keep_local:
+        command: "./lde/scripts/cleanup.sh --keep-local"
+        expected: ".local/mcp-inspector preserved"
+      exit_codes:
+        0: "Cleanup successful"
+
+  - name: load-data.sh
+    path: "lde/scripts/load-data.sh"
+    modifications:
+      - location: "None"
+        change: "No modifications required"
+        rationale: "MCP Inspector does not interact with data loading"
+
+test_contracts:
+  - name: "test-start-interface"
+    file: "tests/lde/test-start-interface.sh"
+    modifications:
+      - "Update expected service count from 5 to 6"
+      - "Verify MCP Inspector in output"
+      - "Verify port 19007 accessible"
+
+  - name: "test-compose-validity"
+    file: "tests/lde/test-compose-validity.sh"
+    modifications:
+      - "Validate mcp-inspector service definition"
+      - "Verify all required fields present"
+
+integration_behavior:
+  startup_sequence:
+    - "docker compose up starts all services including mcp-inspector"
+    - "start.sh waits for health checks (6 services)"
+    - "MCP Inspector accessible at http://localhost:19007"
+
+  health_check_sequence:
+    - "health-check.sh checks 6 services"
+    - "MCP Inspector verified via container running status"
+    - "Results aggregated and displayed"
+
+  shutdown_sequence:
+    - "stop.sh stops all services including mcp-inspector"
+    - ".local/mcp-inspector data preserved"
+
+  cleanup_sequence:
+    - "cleanup.sh removes containers"
+    - "cleanup.sh removes .local/mcp-inspector directory"
+    - "cleanup.sh --keep-local preserves Inspector data"

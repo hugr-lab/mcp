@@ -65,9 +65,7 @@ services:
     command: ["start-dev", "--http-relative-path=/", "--import-realm", "--http-port=8080"]
     environment:
       - KC_HEALTH_ENABLED=true
-      - KC_HOSTNAME_PORT=${KEYCLOAK_PORT:-19005}
-      - KC_HOSTNAME_STRICT=false
-      - KC_HOSTNAME_STRICT_HTTPS=false
+      - KC_HOSTNAME_ADMIN_PORT=19005
       - KC_HTTP_ENABLED=true
       - KC_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_ADMIN:-admin}
       - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -151,6 +149,20 @@ services:
         limits:
           memory: 20G
 
+  # MCP Inspector - Web-based MCP server testing tool
+  mcp-inspector:
+    image: ${MCP_INSPECTOR_IMAGE:-ghcr.io/modelcontextprotocol/inspector:latest}
+    container_name: lde-mcp-inspector
+    environment:
+      - HOST=${MCP_INSPECTOR_HOST:-0.0.0.0}
+      - ALLOWED_ORIGINS=${MCP_INSPECTOR_ALLOWED_ORIGINS:-http://localhost:19007}
+    ports:
+      - "19007:6274"  # Client UI
+      - "19008:6277"  # Proxy server
+    volumes:
+      - ./.local/mcp-inspector:/data
+    restart: unless-stopped
+
 networks:
   default:
     name: lde-network
@@ -160,10 +172,10 @@ models:
   # Text summarization model (21B parameters, ~3.6B active per token)
   summarize:
     model: ai/gpt-oss:latest
-    context_size: 8192
+    context_size: 16384
     runtime_flags:
       - --temperature=0.7
-      - --max-tokens=2048
+      - --max-tokens=8192
 
   # Text embedding model (308M parameters, Google DeepMind)
   embeddings:

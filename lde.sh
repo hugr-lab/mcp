@@ -98,7 +98,7 @@ cmd_start() {
     local args=("$@")
 
     # Check if data already exists and --no-data flag is not set
-    if data_exists && [[ ! " ${args[*]} " =~ " --no-data " ]]; then
+    if data_exists && [[ ${#args[@]} -eq 0 || ! " ${args[*]} " =~ " --no-data " ]]; then
         log_info "Data already exists, starting without data loading..."
         args+=("--no-data")
     fi
