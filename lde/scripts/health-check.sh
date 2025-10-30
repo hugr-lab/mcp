@@ -57,6 +57,7 @@ Services Checked:
   • MinIO (HTTP health endpoint)
   • Keycloak (HTTP health endpoint)
   • Hugr (HTTP healthz endpoint)
+  • MCP Inspector (container status)
 
 EOF
     exit 0
@@ -131,6 +132,10 @@ KEYCLOAK_ERROR=""
 HUGR_STATUS=""
 HUGR_TIME=""
 HUGR_ERROR=""
+
+MCP_INSPECTOR_STATUS=""
+MCP_INSPECTOR_TIME=""
+MCP_INSPECTOR_ERROR=""
 
 # Check PostgreSQL
 check_postgres() {
@@ -228,6 +233,25 @@ check_hugr() {
     fi
 }
 
+# Check MCP Inspector
+check_mcp_inspector() {
+    local start_time=$(perl -MTime::HiRes -e 'printf("%.0f",Time::HiRes::time()*1000)')
+
+    log_verbose "Checking MCP Inspector..."
+
+    if docker ps --filter "name=lde-mcp-inspector" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "lde-mcp-inspector"; then
+        local end_time=$(perl -MTime::HiRes -e 'printf("%.0f",Time::HiRes::time()*1000)')
+        local response_time=$((end_time - start_time))
+        MCP_INSPECTOR_STATUS="healthy"
+        MCP_INSPECTOR_TIME="${response_time}ms"
+        return 0
+    else
+        MCP_INSPECTOR_STATUS="unhealthy"
+        MCP_INSPECTOR_ERROR="Container not running"
+        return 1
+    fi
+}
+
 # Check all services
 check_all_services() {
     check_postgres || true
@@ -235,11 +259,12 @@ check_all_services() {
     check_minio || true
     check_keycloak || true
     check_hugr || true
+    check_mcp_inspector || true
 }
 
 # Display service status
 display_status() {
-    local total=5
+    local total=6
     local healthy=0
 
     echo ""
@@ -248,42 +273,50 @@ display_status() {
 
     # PostgreSQL
     if [[ "${POSTGRES_STATUS}" == "healthy" ]]; then
-        echo -e "  PostgreSQL:  ${GREEN}✓ Healthy${NC} (Response: ${POSTGRES_TIME})"
+        echo -e "  PostgreSQL:    ${GREEN}✓ Healthy${NC} (Response: ${POSTGRES_TIME})"
         ((healthy++))
     else
-        echo -e "  PostgreSQL:  ${RED}✗ Unhealthy${NC} (${POSTGRES_ERROR})"
+        echo -e "  PostgreSQL:    ${RED}✗ Unhealthy${NC} (${POSTGRES_ERROR})"
     fi
 
     # Redis
     if [[ "${REDIS_STATUS}" == "healthy" ]]; then
-        echo -e "  Redis:       ${GREEN}✓ Healthy${NC} (Response: ${REDIS_TIME})"
+        echo -e "  Redis:         ${GREEN}✓ Healthy${NC} (Response: ${REDIS_TIME})"
         ((healthy++))
     else
-        echo -e "  Redis:       ${RED}✗ Unhealthy${NC} (${REDIS_ERROR})"
+        echo -e "  Redis:         ${RED}✗ Unhealthy${NC} (${REDIS_ERROR})"
     fi
 
     # MinIO
     if [[ "${MINIO_STATUS}" == "healthy" ]]; then
-        echo -e "  MinIO:       ${GREEN}✓ Healthy${NC} (Response: ${MINIO_TIME})"
+        echo -e "  MinIO:         ${GREEN}✓ Healthy${NC} (Response: ${MINIO_TIME})"
         ((healthy++))
     else
-        echo -e "  MinIO:       ${RED}✗ Unhealthy${NC} (${MINIO_ERROR})"
+        echo -e "  MinIO:         ${RED}✗ Unhealthy${NC} (${MINIO_ERROR})"
     fi
 
     # Keycloak
     if [[ "${KEYCLOAK_STATUS}" == "healthy" ]]; then
-        echo -e "  Keycloak:    ${GREEN}✓ Healthy${NC} (Response: ${KEYCLOAK_TIME})"
+        echo -e "  Keycloak:      ${GREEN}✓ Healthy${NC} (Response: ${KEYCLOAK_TIME})"
         ((healthy++))
     else
-        echo -e "  Keycloak:    ${RED}✗ Unhealthy${NC} (${KEYCLOAK_ERROR})"
+        echo -e "  Keycloak:      ${RED}✗ Unhealthy${NC} (${KEYCLOAK_ERROR})"
     fi
 
     # Hugr
     if [[ "${HUGR_STATUS}" == "healthy" ]]; then
-        echo -e "  Hugr:        ${GREEN}✓ Healthy${NC} (Response: ${HUGR_TIME})"
+        echo -e "  Hugr:          ${GREEN}✓ Healthy${NC} (Response: ${HUGR_TIME})"
         ((healthy++))
     else
-        echo -e "  Hugr:        ${RED}✗ Unhealthy${NC} (${HUGR_ERROR})"
+        echo -e "  Hugr:          ${RED}✗ Unhealthy${NC} (${HUGR_ERROR})"
+    fi
+
+    # MCP Inspector
+    if [[ "${MCP_INSPECTOR_STATUS}" == "healthy" ]]; then
+        echo -e "  MCP Inspector: ${GREEN}✓ Healthy${NC} (Response: ${MCP_INSPECTOR_TIME})"
+        ((healthy++))
+    else
+        echo -e "  MCP Inspector: ${RED}✗ Unhealthy${NC} (${MCP_INSPECTOR_ERROR})"
     fi
 
     echo ""
@@ -304,6 +337,7 @@ display_status() {
         [[ "${MINIO_STATUS}" != "healthy" ]] && echo -e "  • MinIO: ${MINIO_ERROR}"
         [[ "${KEYCLOAK_STATUS}" != "healthy" ]] && echo -e "  • Keycloak: ${KEYCLOAK_ERROR}"
         [[ "${HUGR_STATUS}" != "healthy" ]] && echo -e "  • Hugr: ${HUGR_ERROR}"
+        [[ "${MCP_INSPECTOR_STATUS}" != "healthy" ]] && echo -e "  • MCP Inspector: ${MCP_INSPECTOR_ERROR}"
 
         echo ""
         echo -e "${YELLOW}Troubleshooting:${NC}"
@@ -337,10 +371,11 @@ wait_for_healthy() {
         [[ "${MINIO_STATUS}" == "healthy" ]] && ((healthy++))
         [[ "${KEYCLOAK_STATUS}" == "healthy" ]] && ((healthy++))
         [[ "${HUGR_STATUS}" == "healthy" ]] && ((healthy++))
+        [[ "${MCP_INSPECTOR_STATUS}" == "healthy" ]] && ((healthy++))
 
-        log_verbose "Healthy services: ${healthy}/5"
+        log_verbose "Healthy services: ${healthy}/6"
 
-        if [[ $healthy -eq 5 ]]; then
+        if [[ $healthy -eq 6 ]]; then
             display_status
             return 0
         fi

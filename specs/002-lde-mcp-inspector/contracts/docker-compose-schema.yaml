@@ -1,0 +1,111 @@
+# Contract: MCP Inspector Docker Compose Service Definition
+# Feature: 002-lde-mcp-inspector
+# Date: 2025-10-30
+
+# This file defines the contract for the mcp-inspector service block
+# in lde/docker-compose.yml
+
+service_name: mcp-inspector
+
+required_fields:
+  image:
+    type: string
+    pattern: "^ghcr\\.io/modelcontextprotocol/inspector:.+"
+    description: "Must reference official MCP Inspector image"
+    example: "${MCP_INSPECTOR_IMAGE:-ghcr.io/modelcontextprotocol/inspector:latest}"
+
+  container_name:
+    type: string
+    value: "lde-mcp-inspector"
+    description: "Must follow lde-* naming convention"
+
+  ports:
+    type: array
+    description: "Port mappings for UI and proxy access"
+    items:
+      - port: "19007:6274"
+        description: "UI port mapping"
+      - port: "19007:6277"
+        description: "Proxy port mapping"
+    note: "Both default Inspector ports (6274, 6277) mapped to single LDE port (19007)"
+
+  environment:
+    type: array
+    description: "Environment variables for configuration"
+    required_vars:
+      - name: "HOST"
+        example: "${MCP_INSPECTOR_HOST:-0.0.0.0}"
+        description: "Network interface binding"
+      - name: "ALLOWED_ORIGINS"
+        example: "${MCP_INSPECTOR_ALLOWED_ORIGINS:-http://localhost:19007}"
+        description: "CORS allowed origins"
+
+  volumes:
+    type: array
+    required_items:
+      - source: "./.local/mcp-inspector"
+        target: "/data"
+        description: "Persistent storage for test history"
+
+  restart:
+    type: string
+    value: "unless-stopped"
+    description: "Restart policy consistent with other LDE services"
+
+optional_fields:
+  healthcheck:
+    note: "Not required - health check performed by health-check.sh via container status"
+
+  depends_on:
+    note: "Not required - Inspector is independent of other services"
+
+validation_rules:
+  - name: "Port uniqueness"
+    rule: "Port 19007 must not conflict with existing services"
+    existing_ports:
+      - 19000: "Hugr GraphQL"
+      - 19001: "PostgreSQL"
+      - 19002: "Redis"
+      - 19003: "MinIO API"
+      - 19004: "MinIO Console"
+      - 19005: "Keycloak"
+      - 19006: "Hugr Health"
+
+  - name: "Volume path"
+    rule: "./.local/mcp-inspector must be relative to docker-compose.yml location"
+
+  - name: "Environment variable substitution"
+    rule: "All configurable values must support ${VAR:-default} syntax"
+
+integration_points:
+  - file: "lde/.env.example"
+    description: "Defines default environment variable values"
+
+  - file: "lde/scripts/health-check.sh"
+    description: "Checks container running status"
+
+  - file: "lde/scripts/start.sh"
+    description: "Starts service with docker compose up"
+
+  - file: "lde/scripts/stop.sh"
+    description: "Stops service with docker compose stop"
+
+  - file: "lde/scripts/cleanup.sh"
+    description: "Removes volume directory"
+
+test_validation:
+  - test_name: "Service definition exists"
+    command: "docker compose -f lde/docker-compose.yml config --services"
+    expected_output_contains: "mcp-inspector"
+
+  - test_name: "Service has required fields"
+    command: "docker compose -f lde/docker-compose.yml config"
+    expected_structure:
+      services:
+        mcp-inspector:
+          image: "*inspector*"
+          container_name: "lde-mcp-inspector"
+          ports: ["*19007*"]
+          environment: ["*HOST*", "*ALLOWED_ORIGINS*"]
+          volumes: ["*.local/mcp-inspector*"]
+          restart: "unless-stopped"

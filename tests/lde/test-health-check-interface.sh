@@ -123,7 +123,7 @@ else
     fail "Script does not exist"
 fi
 
-# Test 7: Script checks all 5 services
+# Test 7: Script checks all 6 services
 test_case "health-check.sh checks all required services"
 if [ -f "$HEALTH_SCRIPT" ]; then
     MISSING_SERVICES=""
@@ -132,9 +132,10 @@ if [ -f "$HEALTH_SCRIPT" ]; then
     grep -qi "minio" "$HEALTH_SCRIPT" || MISSING_SERVICES="$MISSING_SERVICES minio"
     grep -qi "keycloak" "$HEALTH_SCRIPT" || MISSING_SERVICES="$MISSING_SERVICES keycloak"
     grep -qi "hugr" "$HEALTH_SCRIPT" || MISSING_SERVICES="$MISSING_SERVICES hugr"
+    grep -qi "mcp.*inspector\|inspector.*mcp" "$HEALTH_SCRIPT" || MISSING_SERVICES="$MISSING_SERVICES mcp-inspector"
 
     if [ -z "$MISSING_SERVICES" ]; then
-        pass "Script checks all 5 services"
+        pass "Script checks all 6 services"
     else
         fail "Script doesn't check:$MISSING_SERVICES"
     fi

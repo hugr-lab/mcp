@@ -119,14 +119,14 @@ else
     fail "Cannot check services: compose file invalid or missing"
 fi
 
-# Test 8: Exactly 5 services (no extras)
-test_case "Exactly 5 services defined (no extras)"
+# Test 8: Exactly 6 services (no extras)
+test_case "Exactly 6 services defined (no extras)"
 if [ -n "$SERVICES" ]; then
     SERVICE_COUNT=$(echo "$SERVICES" | wc -l)
-    if [ "$SERVICE_COUNT" -eq 5 ]; then
-        pass "Exactly 5 services defined"
+    if [ "$SERVICE_COUNT" -eq 6 ]; then
+        pass "Exactly 6 services defined"
     else
-        fail "Expected 5 services, found $SERVICE_COUNT"
+        fail "Expected 6 services, found $SERVICE_COUNT"
     fi
 else
     fail "Cannot count services: compose file invalid or missing"

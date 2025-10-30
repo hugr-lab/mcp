@@ -133,6 +133,7 @@ show_warning() {
         echo "     - Redis cache"
         echo "     - MinIO objects"
         echo "     - Keycloak realms and users"
+        echo "     - MCP Inspector test history"
     else
         echo -e "  ${GREEN}✓${NC} .local/ directory (PRESERVED)"
     fi

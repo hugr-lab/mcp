@@ -1,0 +1,216 @@
+# Data Model: LDE MCP Inspector
+
+**Feature**: 002-lde-mcp-inspector
+**Date**: 2025-10-30
+
+## Overview
+This document defines the configuration and data entities for the MCP Inspector service within the LDE.
+
+## Entities
+
+### 1. MCP Inspector Service
+
+**Description**: Docker Compose service definition for MCP Inspector container.
+
+**Attributes**:
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| image | string | Yes | Docker image name and tag (`ghcr.io/modelcontextprotocol/inspector:latest`) |
+| container_name | string | Yes | Container identifier (`lde-mcp-inspector`) |
+| ports | array | Yes | Port mappings (host:container format) |
+| environment | array | Yes | Environment variable definitions |
+| volumes | array | Yes | Volume mount specifications |
+| restart | string | Yes | Restart policy (`unless-stopped`) |
+
+**Validation Rules**:
+- Image must be from official MCP registry
+- Container name must follow `lde-*` naming pattern
+- Ports must map to LDE range (19000-19020)
+- Must include volume mount for persistence
+
+**State Transitions**:
+```
+[Created] → docker-compose up → [Starting] → container healthy → [Running]
+[Running] → docker-compose stop → [Stopped]
+[Stopped] → docker-compose start → [Running]
+[*] → docker-compose down → [Removed]
+```
+
+### 2. MCP Inspector Configuration
+
+**Description**: Environment variables controlling MCP Inspector behavior.
+
+**Attributes**:
+| Attribute | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| MCP_INSPECTOR_IMAGE | string | No | `ghcr.io/modelcontextprotocol/inspector:latest` | Docker image reference |
+| MCP_INSPECTOR_PORT | integer | No | 19007 | Host port for UI and proxy access |
+| MCP_INSPECTOR_HOST | string | No | `0.0.0.0` | Network interface binding |
+| MCP_INSPECTOR_ALLOWED_ORIGINS | string | No | `http://localhost:19007` | CORS allowed origins (comma-separated) |
+| MCP_PROXY_AUTH_TOKEN | string | No | (generated) | Authentication token for proxy access |
+
+**Validation Rules**:
+- PORT must be in range 19000-19020 and not conflict with existing services
+- HOST must be valid IP address or `0.0.0.0`
+- ALLOWED_ORIGINS must be valid HTTP(S) URLs
+- AUTH_TOKEN should be cryptographically secure if set
+
+**Relationships**:
+- Used by: MCP Inspector Service (environment section)
+- Documented in: `.env.example`
+
+###  3. Test History Data
+
+**Description**: Persistent data stored by MCP Inspector including connection configurations, test operations, results, and session logs.
+
+**Storage Location**: `.local/mcp-inspector/`
+
+**Structure** (Inspector-managed, opaque to LDE):
+```
+.local/mcp-inspector/
+├── connections/      # Saved server connection configs
+├── history/          # Test operation history
+├── sessions/         # Session logs
+└── preferences/      # User preferences
+```
+
+**Lifecycle**:
+| Operation | Behavior |
+|-----------|----------|
+| Container start | Mount volume, Inspector loads existing data |
+| Container restart | Data persists, Inspector restores state |
+| Container stop | Data remains on host |
+| cleanup.sh (default) | Entire directory removed |
+| cleanup.sh --keep-local | Directory preserved |
+
+**Validation Rules**:
+- Directory must be writable by container user
+- Data format managed by Inspector (no LDE validation)
+
+**Relationships**:
+- Owned by: MCP Inspector Service
+- Managed by: Docker volume mount
+- Cleaned by: cleanup.sh script
+
+### 4. Service Health Status
+
+**Description**: Health check result for MCP Inspector service.
+
+**Attributes**:
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| status | enum | `healthy`, `unhealthy` |
+| check_method | string | Always `"container_status"` |
+| response_time | string | Time to check status (e.g., `"15ms"`) |
+| error_message | string | Error description if unhealthy (e.g., `"Container not running"`) |
+
+**Status Determination**:
+```
+IF docker ps shows lde-mcp-inspector with status=running
+  THEN status = "healthy"
+ELSE
+  THEN status = "unhealthy", error = "Container not running"
+```
+
+**Validation Rules**:
+- Status must be binary (healthy/unhealthy)
+- Response time must be measured for performance tracking
+- Error message required when unhealthy
+
+**Relationships**:
+- Checked by: health-check.sh script
+- Displayed in: Health check output summary
+- Compared with: Other LDE service statuses
+
+## Entity Relationships
+
+```
+MCP Inspector Service (docker-compose.yml)
+  ├── uses → MCP Inspector Configuration (.env, .env.example)
+  ├── creates → Test History Data (.local/mcp-inspector/)
+  └── produces → Service Health Status (health-check.sh output)
+
+MCP Inspector Configuration
+  ├── defined in → .env.example (template)
+  └── overridden in → .env (user values)
+
+Test History Data
+  ├── mounted from → .local/mcp-inspector/
+  └── cleaned by → cleanup.sh
+
+Service Health Status
+  ├── generated by → health-check.sh
+  └── aggregated with → Other service statuses
+```
+
+## Configuration File Mappings
+
+### docker-compose.yml
+```yaml
+services:
+  mcp-inspector:
+    image: ${MCP_INSPECTOR_IMAGE:-ghcr.io/modelcontextprotocol/inspector:latest}
+    container_name: lde-mcp-inspector
+    ports:
+      - "${MCP_INSPECTOR_PORT:-19007}:6274"
+      - "${MCP_INSPECTOR_PORT:-19007}:6277"
+    environment:
+      - HOST=${MCP_INSPECTOR_HOST:-0.0.0.0}
+      - ALLOWED_ORIGINS=${MCP_INSPECTOR_ALLOWED_ORIGINS:-http://localhost:19007}
+    volumes:
+      - ./.local/mcp-inspector:/data
+    restart: unless-stopped
+```
+
+### .env.example
+```bash
+# MCP Inspector
+MCP_INSPECTOR_IMAGE=ghcr.io/modelcontextprotocol/inspector:latest
+MCP_INSPECTOR_PORT=19007
+MCP_INSPECTOR_HOST=0.0.0.0
+MCP_INSPECTOR_ALLOWED_ORIGINS=http://localhost:19007
+```
+
+## Data Flow
+
+```
+1. User runs: ./lde/scripts/start.sh
+   ↓
+2. Docker Compose reads docker-compose.yml
+   ↓
+3. Environment variables loaded from .env (or defaults from .env.example)
+   ↓
+4. MCP Inspector Service created with Configuration
+   ↓
+5. Volume mounted: .local/mcp-inspector/ → /data (in container)
+   ↓
+6. Container starts, Inspector loads Test History Data
+   ↓
+7. health-check.sh queries container status → Service Health Status
+   ↓
+8. User accesses http://localhost:19007 → Inspector UI
+   ↓
+9. User performs tests → Test History Data updated
+   ↓
+10. User runs: ./lde/scripts/cleanup.sh
+    ↓
+11. Container removed, .local/mcp-inspector/ deleted → Test History Data gone
+```
+
+## Validation Summary
+
+| Entity | Validation Point | Validator |
+|--------|------------------|-----------|
+| MCP Inspector Service | Service definition structure | docker-compose config validator |
+| MCP Inspector Service | Container creation | Docker engine |
+| MCP Inspector Configuration | Environment variable presence | test-env-variables.sh |
+| MCP Inspector Configuration | Port uniqueness | docker-compose (port binding) |
+| Test History Data | Directory writable | Docker volume mount |
+| Service Health Status | Container running | health-check.sh |
+
+## Notes
+
+- **Inspector Internals**: Test history data format is managed by MCP Inspector; LDE treats it as opaque
+- **No Database**: Unlike other LDE services, Inspector uses file-based persistence
+- **Single Port Exposure**: LDE exposes one port (19007) for both Inspector UI and proxy
+- **Configuration Flexibility**: All configurable via environment variables in `.env`

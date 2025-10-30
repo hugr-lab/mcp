@@ -17,12 +17,26 @@ Complete local development environment for Hugr MCP service with Docker Compose.
 
 ## What You Get
 
-### Services (5 Docker containers)
+### Services (6 Docker containers)
 - **Hugr** - GraphQL API server (http://localhost:19000/query)
-- **PostgreSQL** - TimescaleDB with pgvector (localhost:19001)
-- **Redis** - 20GB L2 cache (localhost:19002)
-- **MinIO** - S3-compatible storage (http://localhost:19004)
+- **PostgreSQL** - TimescaleDB with pgvector
+  - Host: `localhost:19001`
+  - Connection: `postgresql://hugr:hugr@localhost:19001/hugr`
+  - Credentials: `hugr` / `hugr`
+- **Redis** - 20GB L2 cache
+  - Host: `localhost:19002`
+  - Connection: `redis://localhost:19002`
+- **MinIO** - S3-compatible storage
+  - API: http://localhost:19003
+  - Console: http://localhost:19004
+  - Credentials: `minioadmin` / `minioadmin`
+  - S3 Endpoint: `http://localhost:19003`
 - **Keycloak** - Authentication server (http://localhost:19005)
+  - Admin: `admin` / `admin`
+  - Realm: `hugr`
+- **MCP Inspector** - MCP server testing tool
+  - UI: http://localhost:19007
+  - Proxy: http://localhost:19008
 
 ### Data Sources (5 sources)
 - **Northwind** - PostgreSQL sample database (~5MB)
@@ -158,6 +172,8 @@ See `lde/.env.example` for complete list.
 | MinIO API | 19003 | S3 API |
 | MinIO Console | 19004 | Web UI |
 | Keycloak | 19005 | Auth server |
+| MCP Inspector UI | 19007 | MCP testing UI |
+| MCP Inspector Proxy | 19008 | MCP proxy server |
 
 ## Authentication
 

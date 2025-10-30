@@ -5,7 +5,7 @@ Reproducible local development environment for the Hugr MCP service using Docker
 ## Overview
 
 This LDE provides:
-- **5 Docker services**: Hugr, PostgreSQL (TimescaleDB with pgvector), Redis (20GB L2 cache), MinIO, Keycloak
+- **6 Docker services**: Hugr, PostgreSQL (TimescaleDB with pgvector), Redis (20GB L2 cache), MinIO, Keycloak, MCP Inspector
 - **AI Models**: EmbeddingGemma (308M) for embeddings, GPT-OSS-20B for summarization via Docker models
 - **5 data sources**: Northwind (PostgreSQL), Synthea (DuckDB), Open Payments (DuckDB), OpenWeatherMap (HTTP), EmbeddingGemma (embedding)
 - **Shell scripts**: Environment lifecycle management (start, stop, health-check, load-data)
@@ -48,7 +48,7 @@ cp lde/.env.example lde/.env
 ✓ Prerequisites checked
 → Creating .local directory structure...
 → Starting Docker services...
-✓ All services healthy (5/5)
+✓ All services healthy (6/6)
 → Loading data sources...
 ✓ Synthea data loaded (10,000 patients)
 ✓ Open Payments data loaded (11.8M records)
@@ -60,6 +60,7 @@ Local Development Environment Ready
 Hugr GraphQL:  http://localhost:19000/query
 Keycloak:      http://localhost:19005
 MinIO Console: http://localhost:19004
+MCP Inspector: http://localhost:19007
 
 Test Credentials:
 - admin@example.com    / admin123    (admin role)
@@ -114,6 +115,15 @@ See [DOCKER_MODELS.md](DOCKER_MODELS.md) for detailed configuration.
 - Realm: `hugr` (auto-imported)
 - Roles: admin, analyst, viewer
 - Volume: `.local/keycloak`
+- Console: `http://localhost:19005/admin/hugr/console` (admin@example.com/admin123)
+
+### MCP Inspector (`http://localhost:19007`)
+- Web-based testing and debugging tool for MCP servers
+- Features: Interactive UI, connection management, test history
+- Image: `ghcr.io/modelcontextprotocol/inspector:latest`
+- Ports: 19007 (UI), 19008 (proxy server)
+- Volume: `.local/mcp-inspector` (test history persists across restarts, removed by cleanup.sh)
+- Authentication: Hybrid (Keycloak tokens OR localhost unauthenticated access)
 
 ## Scripts
 
@@ -417,6 +427,9 @@ curl -X POST http://localhost:19000/query \
 | MinIO API | 19003 | 9000 | S3 API |
 | MinIO Console | 19004 | 9001 | Web UI |
 | Keycloak | 19005 | 8080 | Auth server |
+| Hugr Health | 19006 | 14000 | Health/Metrics |
+| MCP Inspector UI | 19007 | 6274 | Web UI |
+| MCP Inspector Proxy | 19008 | 6277 | Proxy Server |
 
 ## Environment Variables
 
